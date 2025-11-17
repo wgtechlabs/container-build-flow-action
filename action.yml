@@ -1,0 +1,252 @@
+name: 'Container Build Flow Action'
+description: 'Automated Docker/Container builds with PR/WIP/DEV/PATCH flow support for Docker Hub and GitHub Container Registry'
+author: 'WG Technology Labs'
+
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  # Registry Configuration
+  registry:
+    description: 'Target container registry (docker-hub, ghcr, or both)'
+    required: false
+    default: 'both'
+  
+  # Docker Hub Credentials
+  dockerhub-username:
+    description: 'Docker Hub username (required if registry includes docker-hub)'
+    required: false
+    default: ''
+  
+  dockerhub-token:
+    description: 'Docker Hub access token (required if registry includes docker-hub)'
+    required: false
+    default: ''
+  
+  dockerhub-username-secret:
+    description: 'Name of secret containing Docker Hub username'
+    required: false
+    default: 'DOCKERHUB_USERNAME'
+  
+  dockerhub-token-secret:
+    description: 'Name of secret containing Docker Hub token'
+    required: false
+    default: 'DOCKERHUB_TOKEN'
+  
+  # GitHub Container Registry Credentials
+  ghcr-token:
+    description: 'GitHub token for GHCR (defaults to GITHUB_TOKEN)'
+    required: false
+    default: ''
+  
+  ghcr-username:
+    description: 'GitHub username for GHCR (defaults to repository owner)'
+    required: false
+    default: ''
+  
+  # Branch Configuration
+  main-branch:
+    description: 'Name of the main/production branch'
+    required: false
+    default: 'main'
+  
+  dev-branch:
+    description: 'Name of the development branch'
+    required: false
+    default: 'dev'
+  
+  # Build Configuration
+  dockerfile:
+    description: 'Path to Dockerfile'
+    required: false
+    default: './Dockerfile'
+  
+  context:
+    description: 'Build context path'
+    required: false
+    default: '.'
+  
+  platforms:
+    description: 'Target platforms (comma-separated, e.g., linux/amd64,linux/arm64)'
+    required: false
+    default: 'linux/amd64'
+  
+  build-args:
+    description: 'Build arguments (newline-separated, e.g., ARG1=value1)'
+    required: false
+    default: ''
+  
+  labels:
+    description: 'Image labels (newline-separated, e.g., key=value)'
+    required: false
+    default: ''
+  
+  cache-enabled:
+    description: 'Enable build cache'
+    required: false
+    default: 'true'
+  
+  # Image Naming
+  image-name:
+    description: 'Container image name (defaults to repository name)'
+    required: false
+    default: ''
+  
+  tag-prefix:
+    description: 'Prefix for image tags (e.g., v1-)'
+    required: false
+    default: ''
+  
+  tag-suffix:
+    description: 'Suffix for image tags (e.g., -alpine)'
+    required: false
+    default: ''
+  
+  # PR Comment Configuration
+  pr-comment-enabled:
+    description: 'Enable PR comments with pull instructions'
+    required: false
+    default: 'true'
+  
+  pr-comment-template:
+    description: 'Custom PR comment template (supports variables: {BUILD_FLOW}, {IMAGE_TAGS}, {REGISTRY_URLS})'
+    required: false
+    default: ''
+  
+  # Advanced Options
+  push-enabled:
+    description: 'Enable pushing to registry (set to false for testing)'
+    required: false
+    default: 'true'
+  
+  load-enabled:
+    description: 'Load image to Docker daemon (useful for local testing)'
+    required: false
+    default: 'false'
+  
+  provenance:
+    description: 'Enable provenance attestation'
+    required: false
+    default: 'true'
+  
+  sbom:
+    description: 'Enable SBOM attestation'
+    required: false
+    default: 'true'
+
+outputs:
+  image-tags:
+    description: 'Complete list of applied image tags'
+    value: ${{ steps.output.outputs.image-tags }}
+  
+  registry-urls:
+    description: 'Full image URLs for each registry'
+    value: ${{ steps.output.outputs.registry-urls }}
+  
+  build-digest:
+    description: 'SHA256 digest of the built image'
+    value: ${{ steps.output.outputs.build-digest }}
+  
+  build-flow-type:
+    description: 'Detected build flow type (pr, dev, patch, wip)'
+    value: ${{ steps.output.outputs.build-flow-type }}
+  
+  short-sha:
+    description: 'Short commit SHA used in tags'
+    value: ${{ steps.output.outputs.short-sha }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect Build Flow and Generate Tags
+      id: detect
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/scripts/detect-build-flow.sh
+      env:
+        MAIN_BRANCH: ${{ inputs.main-branch }}
+        DEV_BRANCH: ${{ inputs.dev-branch }}
+        TAG_PREFIX: ${{ inputs.tag-prefix }}
+        TAG_SUFFIX: ${{ inputs.tag-suffix }}
+        IMAGE_NAME: ${{ inputs.image-name }}
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to Docker Hub
+      if: inputs.registry == 'docker-hub' || inputs.registry == 'both'
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-token }}
+    
+    - name: Login to GitHub Container Registry
+      if: inputs.registry == 'ghcr' || inputs.registry == 'both'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ inputs.ghcr-username || github.repository_owner }}
+        password: ${{ inputs.ghcr-token || github.token }}
+    
+    - name: Extract Docker Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ${{ (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.dockerhub-image || '' }}
+          ${{ (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.ghcr-image || '' }}
+        tags: |
+          type=raw,value=${{ steps.detect.outputs.tags }}
+        labels: |
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+          ${{ inputs.labels }}
+    
+    - name: Build and Push Container Image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        platforms: ${{ inputs.platforms }}
+        push: ${{ inputs.push-enabled }}
+        load: ${{ inputs.load-enabled }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: ${{ inputs.build-args }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: ${{ inputs.provenance }}
+        sbom: ${{ inputs.sbom }}
+    
+    - name: Generate Action Outputs
+      id: output
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/scripts/generate-outputs.sh
+      env:
+        BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+        BUILD_METADATA: ${{ steps.build.outputs.metadata }}
+        BUILD_FLOW_TYPE: ${{ steps.detect.outputs.build-flow-type }}
+        IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        SHORT_SHA: ${{ steps.detect.outputs.short-sha }}
+        REGISTRY: ${{ inputs.registry }}
+    
+    - name: Comment on Pull Request
+      if: inputs.pr-comment-enabled == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.ghcr-token || github.token }}
+        script: |
+          const fs = require('fs');
+          const scriptPath = '${{ github.action_path }}/scripts/pr-comment.js';
+          const script = require(scriptPath);
+          await script({github, context, core});
+      env:
+        BUILD_FLOW_TYPE: ${{ steps.detect.outputs.build-flow-type }}
+        IMAGE_TAGS: ${{ steps.output.outputs.image-tags }}
+        REGISTRY_URLS: ${{ steps.output.outputs.registry-urls }}
+        PR_COMMENT_TEMPLATE: ${{ inputs.pr-comment-template }}
+        REGISTRY: ${{ inputs.registry }}
