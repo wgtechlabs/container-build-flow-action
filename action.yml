@@ -159,12 +159,23 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Resolve Commit SHA
+      id: sha
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_target" ]; then
+          echo "sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+        else
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Detect Build Flow and Generate Tags
       id: detect
       shell: bash
       run: |
         bash ${{ github.action_path }}/scripts/detect-build-flow.sh
       env:
+        GITHUB_SHA: ${{ steps.sha.outputs.sha }}
         MAIN_BRANCH: ${{ inputs.main-branch }}
         DEV_BRANCH: ${{ inputs.dev-branch }}
         TAG_PREFIX: ${{ inputs.tag-prefix }}
@@ -200,7 +211,7 @@ runs:
           type=raw,value=${{ steps.detect.outputs.tags }}
         labels: |
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.revision=${{ steps.sha.outputs.sha }}
           org.opencontainers.image.created=${{ github.event.repository.updated_at }}
           ${{ inputs.labels }}
     
