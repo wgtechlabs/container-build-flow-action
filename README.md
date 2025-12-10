@@ -40,7 +40,7 @@ graph LR
     G --> H[PR Comment]
 ```
 
-**No manual configuration needed.** Just add the action to your workflow, and it handles branch detection, tagging, building, and even PR comments automatically.
+**No manual configuration needed.** Just add the action to your workflow, and it handles branch detection, tagging, building, and PR comments automatically for all flow types—whether triggered by pull requests or direct pushes to tracked branches.
 
 ---
 
@@ -50,7 +50,7 @@ graph LR
 - 🐳 **Dual Registry Support** - Push to Docker Hub, GHCR, or both simultaneously
 - 🏷️ **Smart Tagging Strategy** - `pr-{sha}`, `dev-{sha}`, `patch-{sha}`, `wip-{sha}` flows
 - 🔧 **Highly Configurable** - Customize branches, registries, build options, and more
-- 💬 **PR Comments** - Automatic pull instructions posted to PRs
+- 💬 **Smart PR Comments** - Automatic pull instructions posted to PRs for all flow types (push and pull_request events)
 - 🚀 **Multi-Platform Builds** - Support for `linux/amd64`, `linux/arm64`, and more
 - 🔐 **Security-First** - Built-in SBOM and provenance attestations
 - ⚡ **Build Cache** - GitHub Actions cache integration for faster builds
@@ -323,10 +323,21 @@ jobs:
 
 **Result:**
 - **Flow Type:** `pr`
-- **Tag:** `pr-abc1234`
-- **Comment:** Docker pull instructions posted to PR
+- **Tag:** `pr-abc1234` (uses PR HEAD commit SHA)
+- **Comment:** Docker pull instructions automatically posted to PR
+- **Logs:** `✅ Step 2: Build flow detection complete!` → `✅ Step 3: PR comment complete!` → `✅ Step 4: Output generation complete!`
 
-### Example 2: Dev to Main Promotion
+### Example 2: Push to Dev Branch
+
+**Context:** Direct push to `dev` branch with open PR #18
+
+**Result:**
+- **Flow Type:** `dev`
+- **Tag:** `dev-def5678` (uses actual commit SHA)
+- **Comment:** Finds and updates PR #18 automatically
+- **Logs:** `🔍 Push event detected on branch: dev` → `✅ Found associated PR #18` → `✅ Step 3: PR comment complete!`
+
+### Example 3: Dev to Main Promotion
 
 **Context:** Pull request from `dev` to `main`
 
