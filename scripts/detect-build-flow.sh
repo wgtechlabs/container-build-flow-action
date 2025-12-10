@@ -8,10 +8,11 @@
 # the appropriate build flow type and generate corresponding container tags.
 #
 # Flow Types:
-#   - pr-{sha}    : Pull request targeting dev branch
-#   - dev-{sha}   : Pull request from dev to main branch
-#   - patch-{sha} : Pull request to main (not from dev)
-#   - wip-{sha}   : Work in progress (other branches)
+#   - pr-{sha}      : Pull request targeting dev branch
+#   - dev-{sha}     : Pull request from dev to main branch
+#   - patch-{sha}   : Pull request to main (not from dev)
+#   - staging-{sha} : Push to main branch (pre-production)
+#   - wip-{sha}     : Work in progress (other branches)
 #
 # Usage:
 #   Called automatically by GitHub Actions composite action
@@ -187,10 +188,10 @@ detect_build_flow() {
             flow_type="dev"
             log_success "Flow: Push to dev branch"
             
-        # Push to main branch -> Use 'latest' or semantic version
+        # Push to main branch -> staging for pre-production validation
         elif [ "$branch" = "$MAIN_BRANCH" ]; then
-            flow_type="latest"
-            log_success "Flow: Push to main branch (latest)"
+            flow_type="staging"
+            log_success "Flow: Push to main branch (staging)"
             
         # Push to any other branch -> wip-{sha}
         else

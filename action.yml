@@ -149,7 +149,7 @@ outputs:
     value: ${{ steps.output.outputs.build-digest }}
   
   build-flow-type:
-    description: 'Detected build flow type (pr, dev, patch, wip)'
+    description: 'Detected build flow type (pr, dev, patch, staging, wip)'
     value: ${{ steps.output.outputs.build-flow-type }}
   
   short-sha:

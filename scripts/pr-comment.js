@@ -64,11 +64,11 @@ module.exports = async ({github, context, core}) => {
         description: 'Work in progress experiment',
         color: '#ffd33d'
       },
-      latest: {
-        emoji: '✨',
-        title: 'Latest Build',
-        description: 'Production release',
-        color: '#6f42c1'
+      staging: {
+        emoji: '🚀',
+        title: 'Staging Build',
+        description: 'Pre-production validation',
+        color: '#ffd700'
       }
     };
     
