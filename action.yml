@@ -246,7 +246,7 @@ runs:
         REGISTRY: ${{ inputs.registry }}
     
     - name: Comment on Pull Request
-      if: inputs.pr-comment-enabled == 'true' && github.event_name == 'pull_request'
+      if: inputs.pr-comment-enabled == 'true'
       uses: actions/github-script@v7
       with:
         github-token: ${{ inputs.ghcr-token || github.token }}

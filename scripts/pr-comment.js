@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PR Comment Script - Phase 4 Implementation
+ * PR Comment Script - Step 3 Implementation
  * ===========================================
  * Generates and posts formatted PR comments with docker pull instructions
  * 
@@ -170,10 +170,41 @@ docker run <your-options> <image>
     // POST COMMENT
     // =============================================================================
     
+    let prNumber = null;
+    
+    // For pull_request events, use the PR from payload
     if (context.payload.pull_request) {
-      const prNumber = context.payload.pull_request.number;
+      prNumber = context.payload.pull_request.number;
+      core.info(`📋 PR event detected: #${prNumber}`);
+    } 
+    // For push events, search for open PRs with this branch as head
+    else if (context.eventName === 'push' && context.ref) {
+      const branch = context.ref.replace('refs/heads/', '');
+      core.info(`🔍 Push event detected on branch: ${branch}`);
+      core.info('Searching for associated pull requests...');
       
-      core.info(`Posting comment to PR #${prNumber}`);
+      try {
+        const { data: prs } = await github.rest.pulls.list({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          state: 'open',
+          head: `${context.repo.owner}:${branch}`,
+        });
+        
+        if (prs.length > 0) {
+          prNumber = prs[0].number;
+          core.info(`✅ Found associated PR #${prNumber}`);
+        } else {
+          core.info('ℹ️  No open PRs found for this branch');
+        }
+      } catch (error) {
+        core.warning(`Failed to search for PRs: ${error.message}`);
+      }
+    }
+    
+    if (prNumber) {
+      
+      core.info(`💬 Posting comment to PR #${prNumber}`);
       
       // Check if we already posted a comment
       const { data: comments } = await github.rest.issues.listComments({
@@ -190,7 +221,7 @@ docker run <your-options> <image>
       
       if (botComment) {
         // Update existing comment
-        core.info(`Updating existing comment (ID: ${botComment.id})`);
+        core.info(`🔄 Updating existing comment (ID: ${botComment.id})`);
         await github.rest.issues.updateComment({
           owner: context.repo.owner,
           repo: context.repo.repo,
@@ -200,7 +231,7 @@ docker run <your-options> <image>
         core.info('✅ Comment updated successfully');
       } else {
         // Create new comment
-        core.info('Creating new comment');
+        core.info('✨ Creating new comment');
         await github.rest.issues.createComment({
           owner: context.repo.owner,
           repo: context.repo.repo,
@@ -211,8 +242,9 @@ docker run <your-options> <image>
       }
       
       core.setOutput('comment-posted', 'true');
+      core.info('✅ Step 3: PR comment complete!');
     } else {
-      core.warning('⚠️  Not a pull request event, skipping comment');
+      core.info('ℹ️  No associated pull request found, skipping comment');
       core.setOutput('comment-posted', 'false');
     }
     
