@@ -29,6 +29,7 @@ module.exports = async ({github, context, core}) => {
     const registryUrls = process.env.REGISTRY_URLS || '';
     const customTemplate = process.env.PR_COMMENT_TEMPLATE || '';
     const registry = process.env.REGISTRY || 'both';
+    const resolvedSha = process.env.RESOLVED_SHA || context.sha;
     
     core.info('📝 Generating PR comment...');
     core.debug(`Flow Type: ${buildFlowType}`);
@@ -96,8 +97,23 @@ module.exports = async ({github, context, core}) => {
       
       // Get repository information
       const repoUrl = `${context.payload.repository.html_url}`;
-      const commitSha = context.sha.substring(0, 7);
-      const commitUrl = `${repoUrl}/commit/${context.sha}`;
+      const commitSha = resolvedSha.substring(0, 7);
+      const commitUrl = `${repoUrl}/commit/${resolvedSha}`;
+      
+      // Format registry display
+      const registryDisplay = {
+        'docker-hub': 'Docker Hub',
+        'ghcr': 'GitHub Container Registry',
+        'both': 'Docker Hub + GHCR'
+      }[registry] || registry;
+      
+      // Format image tags for better readability
+      const imageTagsList = imageTags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag)
+        .map(tag => `• \`${tag}\``)
+        .join('<br/>');
       
       commentBody = `## ${flow.emoji} Container Build Complete - ${flow.title}
 
@@ -119,8 +135,11 @@ ${pullCommandsMarkdown}
 |----------|-------|
 | **Flow Type** | \`${buildFlowType}\` |
 | **Commit** | [\`${commitSha}\`](${commitUrl}) |
-| **Registry** | \`${registry}\` |
-| **Image Tags** | \`${imageTags}\` |
+| **Registry** | ${registryDisplay} |
+
+### 🏷️ Image Tags
+
+${imageTagsList}
 
 ---
 
@@ -143,7 +162,8 @@ docker run <your-options> <image>
 
 ---
 
-<sub>🤖 Automated comment by [Container Build Flow Action](https://github.com/wgtechlabs/container-build-flow-action)</sub>`;
+<sub>🤖 Powered by [Container Build Flow Action](https://github.com/wgtechlabs/container-build-flow-action)  
+💻 with ❤️ by [Waren Gonzaga](https://warengonzaga.com) under [WG Technology Labs](https://wgtechlabs.com), and [Him](https://www.youtube.com/watch?v=HHrxS4diLew&t=44s) 🙏</sub>`;
     }
     
     // =============================================================================

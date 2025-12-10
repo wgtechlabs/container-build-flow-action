@@ -261,3 +261,4 @@ runs:
         REGISTRY_URLS: ${{ steps.output.outputs.registry-urls }}
         PR_COMMENT_TEMPLATE: ${{ inputs.pr-comment-template }}
         REGISTRY: ${{ inputs.registry }}
+        RESOLVED_SHA: ${{ steps.sha.outputs.sha }}
