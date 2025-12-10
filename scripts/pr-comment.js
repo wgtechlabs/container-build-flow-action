@@ -11,7 +11,7 @@
  * - Build metadata and links
  * 
  * Environment Variables:
- *   BUILD_FLOW_TYPE      : Detected flow (pr, dev, patch, wip)
+ *   BUILD_FLOW_TYPE      : Detected flow (pr, dev, patch, staging, wip)
  *   IMAGE_TAGS           : Comma-separated image tags
  *   REGISTRY_URLS        : Registry pull commands
  *   PR_COMMENT_TEMPLATE  : Optional custom template
@@ -47,9 +47,9 @@ module.exports = async ({github, context, core}) => {
         color: '#0366d6'
       },
       dev: {
-        emoji: '🚀',
+        emoji: '🛠️',
         title: 'Dev Build',
-        description: 'Staging/pre-production validation',
+        description: 'Development and testing',
         color: '#28a745'
       },
       patch: {
