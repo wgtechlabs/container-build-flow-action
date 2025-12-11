@@ -1,9 +1,6 @@
 # Container Build Flow Action 🐳
 
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Container%20Build%20Flow-blue.svg?colorA=24292e&colorB=0366d6&style=flat&longCache=true&logo=github)](https://github.com/marketplace/actions/container-build-flow-action)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Release](https://img.shields.io/github/release/wgtechlabs/container-build-flow-action.svg)](https://github.com/wgtechlabs/container-build-flow-action/releases)
-[![Made by WG Tech Labs](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Container%20Build%20Flow-blue.svg?colorA=24292e&colorB=0366d6&style=flat&longCache=true&logo=github)](https://github.com/marketplace/actions/container-build-flow-action) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![GitHub Release](https://img.shields.io/github/release/wgtechlabs/container-build-flow-action.svg)](https://github.com/wgtechlabs/container-build-flow-action/releases) [![Made by WG Tech Labs](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs)
 
 > **Intelligent container build automation for modern development workflows.**  
 > Automated Docker/Container builds with branch-aware tagging for Docker Hub and GitHub Container Registry.
@@ -32,12 +29,14 @@ graph LR
     B -->|PR → dev| C[pr-sha]
     B -->|dev → main| D[dev-sha]
     B -->|hotfix → main| E[patch-sha]
-    B -->|other| F[wip-sha]
-    C --> G[Build & Push]
-    D --> G
-    E --> G
-    F --> G
-    G --> H[PR Comment]
+    B -->|push → main| F[staging-sha]
+    B -->|other| G[wip-sha]
+    C --> H[Build & Push]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+    H --> I[PR Comment]
 ```
 
 **No manual configuration needed.** Just add the action to your workflow, and it handles branch detection, tagging, building, and PR comments automatically for all flow types—whether triggered by pull requests or direct pushes to tracked branches.
@@ -113,13 +112,57 @@ build:
 
 ## 📋 Build Flow Types
 
+All flow types use **commit SHA** (first 7 characters) for tagging, ensuring traceability back to the exact code that was built.
+
 | Flow Type | Trigger | Tag Format | Use Case |
 |-----------|---------|------------|----------|
 | **PR** | Pull Request → `dev` branch | `pr-{sha}` | Feature development and testing |
 | **DEV** | Pull Request from `dev` → `main` OR Push to `dev` branch | `dev-{sha}` | Development images |
 | **PATCH** | Pull Request → `main` (not from `dev`) | `patch-{sha}` | Hotfixes and emergency patches |
-| **STAGING** | Push to `main` branch (merge) | `staging-{sha}` | Pre-production validation |
+| **STAGING** | Direct push to `main` branch (after PR merge) | `staging-{sha}` | Pre-production validation before release |
 | **WIP** | Other branches/commits | `wip-{sha}` | Work in progress experiments |
+
+> **Note:** The `{sha}` in each tag represents the **HEAD commit SHA** of the PR or push event, not the PR number. This ensures every build can be traced to its exact source code.
+
+---
+
+## 🏷️ Tagging Strategy
+
+### Why Commit SHA?
+
+Every image tag includes the commit SHA (first 7 characters) instead of PR numbers for several important reasons:
+
+- **Traceability**: Directly links images to exact source code in Git history
+- **Uniqueness**: Guarantees unique tags even across multiple PRs
+- **Reproducibility**: Makes it easy to rebuild or debug specific versions
+- **CI/CD Integration**: Works seamlessly with GitOps workflows
+
+### Tag Format Examples
+
+```bash
+# Feature PR #42 with commit abc1234
+myorg/myapp:pr-abc1234
+
+# Dev branch with commit def5678
+myorg/myapp:dev-def5678
+
+# Staging build after merge to main with commit ghi9012
+myorg/myapp:staging-ghi9012
+
+# With custom prefix/suffix
+myorg/myapp:v1-pr-abc1234-alpine
+```
+
+### Workflow Integration
+
+```yaml
+# In your deployment workflow, reference by SHA
+- name: Deploy to Staging
+  run: |
+    docker pull myorg/myapp:staging-${{ github.sha:0:7 }}
+    docker tag myorg/myapp:staging-${{ github.sha:0:7 }} myorg/myapp:latest
+    # Deploy...
+```
 
 ---
 
@@ -349,12 +392,15 @@ jobs:
 
 ### Example 4: Push to Main Branch (Staging)
 
-**Context:** Push to `main` branch after merging a PR
+**Context:** Direct push to `main` branch (typically after merging a PR)
 
 **Result:**
 - **Flow Type:** `staging`
-- **Tag:** `staging-abc1234`
-- **Purpose:** Pre-production validation before manual release
+- **Tag:** `staging-abc1234` (uses the merge commit SHA)
+- **Purpose:** Pre-production validation - test the exact code that will be released
+- **Workflow:** Build → Deploy to staging environment → Manual validation → Tag for production
+
+> **Best Practice:** Use `staging-{sha}` images for pre-production testing. Once validated, create a semantic version tag (e.g., `v1.2.3`) pointing to the same commit for production deployment.
 
 ### Example 5: Hotfix Patch
 
