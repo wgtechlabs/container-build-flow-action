@@ -116,8 +116,9 @@ build:
 | Flow Type | Trigger | Tag Format | Use Case |
 |-----------|---------|------------|----------|
 | **PR** | Pull Request → `dev` branch | `pr-{sha}` | Feature development and testing |
-| **DEV** | Pull Request from `dev` → `main` | `dev-{sha}` | Staging/pre-production validation |
+| **DEV** | Pull Request from `dev` → `main` OR Push to `dev` branch | `dev-{sha}` | Development images |
 | **PATCH** | Pull Request → `main` (not from `dev`) | `patch-{sha}` | Hotfixes and emergency patches |
+| **STAGING** | Push to `main` branch (merge) | `staging-{sha}` | Pre-production validation |
 | **WIP** | Other branches/commits | `wip-{sha}` | Work in progress experiments |
 
 ---
@@ -292,7 +293,7 @@ jobs:
 | `image-tags` | Complete list of applied image tags |
 | `registry-urls` | Full image URLs for each registry |
 | `build-digest` | SHA256 digest of built image |
-| `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `wip`) |
+| `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`) |
 | `short-sha` | Short commit SHA used in tags |
 
 ### Using Outputs
@@ -346,7 +347,16 @@ jobs:
 - **Tag:** `dev-xyz5678`
 - **Registries:** Both Docker Hub and GHCR
 
-### Example 3: Hotfix Patch
+### Example 4: Push to Main Branch (Staging)
+
+**Context:** Push to `main` branch after merging a PR
+
+**Result:**
+- **Flow Type:** `staging`
+- **Tag:** `staging-abc1234`
+- **Purpose:** Pre-production validation before manual release
+
+### Example 5: Hotfix Patch
 
 **Context:** Pull request from `hotfix/critical-bug` to `main`
 
@@ -355,7 +365,7 @@ jobs:
 - **Tag:** `patch-def9012`
 - **Fast-tracked:** Emergency fix workflow
 
-### Example 4: Work in Progress
+### Example 6: Work in Progress
 
 **Context:** Push to `experiment/new-feature` branch
 
