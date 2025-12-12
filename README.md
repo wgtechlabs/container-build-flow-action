@@ -52,6 +52,7 @@ graph LR
 - 💬 **Smart PR Comments** - Automatic pull instructions posted to PRs for all flow types (push and pull_request events)
 - 🚀 **Multi-Platform Builds** - Support for `linux/amd64`, `linux/arm64`, and more
 - 🔐 **Security-First** - Built-in SBOM and provenance attestations
+- 🔒 **Built-in Security Scanning** - Comprehensive vulnerability scanning with Trivy (source code, Dockerfile, and container images)
 - ⚡ **Build Cache** - GitHub Actions cache integration for faster builds
 
 ---
@@ -273,6 +274,305 @@ jobs:
 
 ---
 
+## 🔒 Security Scanning
+
+This action includes comprehensive built-in security scanning using [Trivy](https://trivy.dev/), providing vulnerability detection for your container images, source code, and Dockerfiles—all enabled by default.
+
+### 🎯 Features
+
+- **🔍 Pre-Build Scanning**: Scan source code and Dockerfile before building
+- **🐳 Container Image Scanning**: Scan final container images for vulnerabilities
+- **📊 GitHub Security Integration**: Automatic SARIF upload to GitHub Security tab
+- **💬 PR Comments**: Detailed vulnerability reports in pull request comments
+- **📈 Baseline Comparison**: Compare vulnerabilities against baseline images
+- **🚨 Fail on Vulnerabilities**: Optional build failure on security issues
+- **⚡ Fast & Configurable**: Customizable severity levels, timeouts, and ignore patterns
+
+### 🚀 Quick Start
+
+**Default Behavior** - Security scanning is enabled automatically:
+
+```yaml
+- name: Build with Security Scanning
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    # Security scanning runs automatically!
+    # - Source code scan
+    # - Dockerfile scan
+    # - Container image scan
+    # - Results uploaded to GitHub Security tab
+    # - Vulnerabilities shown in PR comments
+```
+
+### 📋 Configuration Examples
+
+#### Disable Security Scanning
+
+If you use your own security tools or want to skip scanning:
+
+```yaml
+- name: Build without Security Scanning
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    pre-build-scan-enabled: false
+    image-scan-enabled: false
+    vulnerability-comment-enabled: false
+```
+
+#### Strict Security (Fail on Vulnerabilities)
+
+Fail the build if HIGH or CRITICAL vulnerabilities are found:
+
+```yaml
+- name: Strict Security Build
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    trivy-severity: HIGH,CRITICAL
+    trivy-ignore-unfixed: true
+    fail-on-vulnerability: true
+```
+
+#### Scan All Severity Levels
+
+Include all vulnerabilities (UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL):
+
+```yaml
+- name: Comprehensive Security Scan
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    trivy-severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+```
+
+#### Compare Against Baseline
+
+Track security improvements by comparing against a baseline image:
+
+```yaml
+- name: Build with Baseline Comparison
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    enable-image-comparison: true
+    comparison-baseline-image: myorg/myapp:latest
+```
+
+#### Skip Specific Directories
+
+Exclude directories from scanning (e.g., test fixtures, vendor code):
+
+```yaml
+- name: Build with Selective Scanning
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    trivy-skip-dirs: tests/,vendor/,node_modules/
+```
+
+### 🔧 Advanced Configuration
+
+#### Custom SARIF Categories
+
+Organize security results with custom categories:
+
+```yaml
+- name: Build with Custom SARIF Categories
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    upload-sarif: true
+    sarif-category-source: my-app-source-scan
+    sarif-category-dockerfile: my-app-dockerfile-scan
+    sarif-category-image: my-app-container-scan
+```
+
+#### Longer Timeout for Large Images
+
+Increase scan timeout for large container images:
+
+```yaml
+- name: Build Large Image with Extended Timeout
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    trivy-timeout: 20m0s
+```
+
+### 🙈 Ignoring False Positives
+
+Create a `.trivyignore` file in your repository root:
+
+```bash
+# Copy example file
+cp .trivyignore.example .trivyignore
+
+# Add CVEs to ignore
+echo "CVE-2021-12345" >> .trivyignore
+```
+
+Example `.trivyignore`:
+
+```
+# Known false positive in test dependencies
+CVE-2021-44228
+# Accepted risk with mitigations
+CVE-2022-12345
+```
+
+**Best Practice**: Always document why a vulnerability is ignored.
+
+### 📊 Viewing Results
+
+**GitHub Security Tab**: View detailed vulnerability reports:
+1. Navigate to your repository
+2. Click **Security** tab
+3. Click **Code scanning alerts**
+4. Filter by tool: **Trivy**
+
+**PR Comments**: Vulnerability summaries are automatically added to PR comments with:
+- Pre-build scan results
+- Container vulnerability counts by severity
+- Comparison with baseline (if enabled)
+- Expandable details for each vulnerability
+- Links to GitHub Security tab
+
+### 🎯 Security Scanning Inputs
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `pre-build-scan-enabled` | Enable pre-build security scanning | No | `true` |
+| `scan-source-code` | Scan source code and dependencies | No | `true` |
+| `scan-dockerfile` | Scan Dockerfile for misconfigurations | No | `true` |
+| `image-scan-enabled` | Enable post-build container image scanning | No | `true` |
+| `trivy-severity` | Severity levels to scan (comma-separated) | No | `HIGH,CRITICAL` |
+| `trivy-ignore-unfixed` | Ignore vulnerabilities without fixes | No | `false` |
+| `trivy-timeout` | Trivy scan timeout duration | No | `10m0s` |
+| `trivy-skip-dirs` | Directories to skip (comma-separated) | No | `''` |
+| `trivy-skip-files` | Files to skip (comma-separated) | No | `''` |
+| `upload-sarif` | Upload results to GitHub Security tab | No | `true` |
+| `sarif-category-source` | SARIF category for source code scan | No | `trivy-source-scan` |
+| `sarif-category-dockerfile` | SARIF category for Dockerfile scan | No | `trivy-dockerfile-scan` |
+| `sarif-category-image` | SARIF category for container image scan | No | `trivy-container-scan` |
+| `vulnerability-comment-enabled` | Add vulnerability info to PR comments | No | `true` |
+| `enable-image-comparison` | Compare with baseline image | No | `false` |
+| `comparison-baseline-image` | Baseline image for comparison | No | `''` |
+| `fail-on-vulnerability` | Fail build if vulnerabilities found | No | `false` |
+
+### 📤 Security Scanning Outputs
+
+| Output | Description |
+|--------|-------------|
+| `vulnerability-scan-completed` | Whether scanning completed successfully |
+| `total-vulnerabilities` | Total number of vulnerabilities found |
+| `critical-vulnerabilities` | Number of CRITICAL vulnerabilities |
+| `high-vulnerabilities` | Number of HIGH vulnerabilities |
+| `medium-vulnerabilities` | Number of MEDIUM vulnerabilities |
+| `low-vulnerabilities` | Number of LOW vulnerabilities |
+
+**Using Outputs**:
+
+```yaml
+- name: Build Container
+  id: build
+  uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+- name: Check Vulnerability Results
+  run: |
+    echo "Scan completed: ${{ steps.build.outputs.vulnerability-scan-completed }}"
+    echo "Total vulnerabilities: ${{ steps.build.outputs.total-vulnerabilities }}"
+    echo "Critical: ${{ steps.build.outputs.critical-vulnerabilities }}"
+    echo "High: ${{ steps.build.outputs.high-vulnerabilities }}"
+```
+
+### ❓ FAQ
+
+#### Why Trivy instead of Docker Scout?
+
+Trivy is:
+- ✅ Open source and free
+- ✅ No vendor lock-in
+- ✅ Comprehensive (CVE, misconfigurations, secrets, licenses)
+- ✅ Fast and lightweight
+- ✅ Well-maintained by Aqua Security
+- ✅ Native GitHub Actions integration
+
+#### Can I use my own security scanning tools?
+
+Yes! Disable the built-in scanning:
+
+```yaml
+pre-build-scan-enabled: false
+image-scan-enabled: false
+vulnerability-comment-enabled: false
+```
+
+Then add your own security scanning steps.
+
+#### Will security scanning slow down my builds?
+
+Security scanning adds approximately:
+- **Source code scan**: 30-60 seconds
+- **Dockerfile scan**: 5-10 seconds
+- **Container image scan**: 1-3 minutes
+
+Total overhead: **2-5 minutes** on average.
+
+To minimize impact:
+- Use `trivy-severity: HIGH,CRITICAL` (default)
+- Set `trivy-ignore-unfixed: true`
+- Use GitHub Actions caching (automatic)
+
+#### How do I handle false positives?
+
+1. Create a `.trivyignore` file in your repository root
+2. Add CVE IDs to ignore (one per line)
+3. Document why each CVE is ignored
+4. Review ignored CVEs regularly
+
+Example:
+```bash
+# Create from example
+cp .trivyignore.example .trivyignore
+
+# Add specific CVE
+echo "CVE-2021-12345  # False positive in test deps" >> .trivyignore
+```
+
+#### What permissions are required?
+
+For full security scanning features, add these to your workflow:
+
+```yaml
+permissions:
+  contents: read           # Read repository content
+  packages: write          # Push to registries
+  security-events: write   # Upload SARIF to Security tab
+  pull-requests: write     # Comment on PRs
+```
+
+### 📚 Example Workflows
+
+See the [`examples/`](examples/) directory for complete workflow examples:
+- [`basic-scanning.yml`](examples/basic-scanning.yml) - Default security scanning
+- [`strict-security.yml`](examples/strict-security.yml) - Fail on vulnerabilities
+- [`with-comparison.yml`](examples/with-comparison.yml) - Baseline comparison
+
+---
+
 ## 📖 Inputs
 
 ### Registry Configuration
@@ -327,6 +627,28 @@ jobs:
 | `provenance` | Enable provenance attestation | No | `true` |
 | `sbom` | Enable SBOM attestation | No | `true` |
 
+### Security Scanning
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `pre-build-scan-enabled` | Enable pre-build security scanning | No | `true` |
+| `scan-source-code` | Scan source code and dependencies | No | `true` |
+| `scan-dockerfile` | Scan Dockerfile for misconfigurations | No | `true` |
+| `image-scan-enabled` | Enable post-build container image scanning | No | `true` |
+| `trivy-severity` | Severity levels to scan (comma-separated) | No | `HIGH,CRITICAL` |
+| `trivy-ignore-unfixed` | Ignore vulnerabilities without fixes | No | `false` |
+| `trivy-timeout` | Trivy scan timeout duration | No | `10m0s` |
+| `trivy-skip-dirs` | Directories to skip (comma-separated) | No | `''` |
+| `trivy-skip-files` | Files to skip (comma-separated) | No | `''` |
+| `upload-sarif` | Upload results to GitHub Security tab | No | `true` |
+| `sarif-category-source` | SARIF category for source code scan | No | `trivy-source-scan` |
+| `sarif-category-dockerfile` | SARIF category for Dockerfile scan | No | `trivy-dockerfile-scan` |
+| `sarif-category-image` | SARIF category for container image scan | No | `trivy-container-scan` |
+| `vulnerability-comment-enabled` | Add vulnerability info to PR comments | No | `true` |
+| `enable-image-comparison` | Compare with baseline image | No | `false` |
+| `comparison-baseline-image` | Baseline image for comparison | No | `''` |
+| `fail-on-vulnerability` | Fail build if vulnerabilities found | No | `false` |
+
 ---
 
 ## 📤 Outputs
@@ -338,6 +660,12 @@ jobs:
 | `build-digest` | SHA256 digest of built image |
 | `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`) |
 | `short-sha` | Short commit SHA used in tags |
+| `vulnerability-scan-completed` | Whether vulnerability scanning completed successfully |
+| `total-vulnerabilities` | Total number of vulnerabilities found |
+| `critical-vulnerabilities` | Number of CRITICAL severity vulnerabilities |
+| `high-vulnerabilities` | Number of HIGH severity vulnerabilities |
+| `medium-vulnerabilities` | Number of MEDIUM severity vulnerabilities |
+| `low-vulnerabilities` | Number of LOW severity vulnerabilities |
 
 ### Using Outputs
 

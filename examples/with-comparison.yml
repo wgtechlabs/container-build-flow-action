@@ -1,0 +1,65 @@
+name: Container Build with Vulnerability Comparison
+
+# Advanced usage with baseline image comparison
+# This workflow compares new builds against a baseline to track security improvements
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build and Push Container with Comparison
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          # Registry credentials
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+          # Enable all security scanning features
+          pre-build-scan-enabled: true
+          scan-source-code: true
+          scan-dockerfile: true
+          image-scan-enabled: true
+          
+          # Configure Trivy scanning
+          trivy-severity: HIGH,CRITICAL
+          trivy-ignore-unfixed: false
+          trivy-timeout: 10m0s
+          
+          # Enable vulnerability comparison with baseline
+          enable-image-comparison: true
+          comparison-baseline-image: ${{ github.repository }}:latest
+          
+          # Upload SARIF results with custom categories
+          upload-sarif: true
+          sarif-category-source: trivy-source-scan
+          sarif-category-dockerfile: trivy-dockerfile-scan
+          sarif-category-image: trivy-container-scan
+          
+          # Show detailed comparison in PR comments
+          vulnerability-comment-enabled: true
+          
+          # Don't fail on vulnerabilities, just report them
+          fail-on-vulnerability: false
+      
+      - name: Display comparison summary
+        if: always()
+        run: |
+          echo "📊 Vulnerability comparison against baseline"
+          echo "Check PR comment for detailed comparison"
+          echo "View detailed results in GitHub Security tab"

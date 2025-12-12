@@ -27,6 +27,10 @@ tmp/
 temp/
 *.tmp
 
+# Trivy scan results (generated during CI)
+trivy-*.json
+trivy-*.sarif
+
 # Environment
 .env
 .env.local

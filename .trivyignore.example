@@ -1,0 +1,46 @@
+# Trivy Ignore File Example
+# =========================
+# This file allows you to ignore specific vulnerabilities that are false positives
+# or acceptable risks in your container images.
+#
+# Usage:
+#   1. Copy this file to .trivyignore in your repository root
+#   2. Add CVE IDs or vulnerability IDs to ignore
+#   3. Trivy will skip these vulnerabilities during scanning
+#
+# Format:
+#   - One vulnerability ID per line
+#   - Lines starting with # are comments
+#   - Blank lines are ignored
+#
+# Example: Ignore specific CVEs
+# CVE-2021-12345
+# CVE-2022-67890
+#
+# Best Practices:
+#   - Always add a comment explaining why a vulnerability is ignored
+#   - Regularly review ignored vulnerabilities
+#   - Link to tracking issues or security assessments
+#   - Consider expiration dates for ignored vulnerabilities
+
+# Example 1: False positive in test dependencies
+# CVE-2021-44228
+# Reason: Log4j vulnerability not exploitable in our use case (not exposed)
+# Tracked in: https://github.com/yourorg/yourrepo/issues/123
+# Review by: 2024-12-31
+
+# Example 2: Accepted risk with mitigations in place
+# CVE-2022-12345
+# Reason: Vulnerability in legacy component with firewall protections
+# Mitigation: Network-level controls prevent exploitation
+# Approved by: Security Team
+# Review by: 2024-06-30
+
+# Example 3: Vulnerability without available fix
+# CVE-2023-00000
+# Reason: No patch available yet, monitoring upstream
+# Workaround: Input validation applied at application level
+# Tracked in: https://github.com/upstream/project/issues/456
+
+# Add your ignored vulnerabilities below:
+# --------------------------------------------

@@ -1,0 +1,36 @@
+name: Container Build with Security Scanning
+
+# Basic usage with default security scanning enabled
+# This workflow demonstrates the simplest configuration with all security features enabled by default
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+      security-events: write  # Required for SARIF upload
+      pull-requests: write    # Required for PR comments
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build and Push Container with Security Scanning
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          # Registry credentials
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+          # Security scanning is enabled by default
+          # All scans (source code, Dockerfile, container image) will run automatically
+          # Results will be uploaded to GitHub Security tab
+          # PR comments will include vulnerability information
