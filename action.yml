@@ -302,7 +302,7 @@ runs:
     
     - name: Run Trivy Filesystem Scan (Source Code)
       if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true'
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'fs'
@@ -317,7 +317,7 @@ runs:
     
     - name: Upload Source Code Scan to GitHub Security
       if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true'
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'fs'
@@ -340,7 +340,7 @@ runs:
     
     - name: Run Trivy Config Scan (Dockerfile)
       if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true'
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'config'
@@ -352,7 +352,7 @@ runs:
     
     - name: Upload Dockerfile Scan to GitHub Security
       if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true'
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'config'
@@ -440,7 +440,7 @@ runs:
     
     - name: Scan Baseline Image (for comparison)
       if: inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != ''
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -453,7 +453,7 @@ runs:
     
     - name: Scan Container Image
       if: inputs.image-scan-enabled == 'true'
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -506,7 +506,7 @@ runs:
     
     - name: Upload Container Image Scan to GitHub Security
       if: inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true'
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
         scan-type: 'image'
