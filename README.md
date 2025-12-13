@@ -2,8 +2,8 @@
 
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Container%20Build%20Flow-blue.svg?colorA=24292e&colorB=0366d6&style=flat&longCache=true&logo=github)](https://github.com/marketplace/actions/container-build-flow-action) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![GitHub Release](https://img.shields.io/github/release/wgtechlabs/container-build-flow-action.svg)](https://github.com/wgtechlabs/container-build-flow-action/releases) [![Made by WG Tech Labs](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs)
 
-> **Intelligent container build automation for modern development workflows.**  
-> Automated Docker/Container builds with branch-aware tagging for Docker Hub and GitHub Container Registry.
+> **Unified container build pipeline from development to production.**  
+> Automated Docker/Container builds with intelligent flow detection, semantic versioning, and built-in SBOM/provenance for Docker Hub and GitHub Container Registry.
 
 Stop writing repetitive Docker build workflows. This GitHub Action automatically detects your branch context (PR, dev, patch, or WIP) and builds container images with intelligent tags—no configuration gymnastics required.
 
@@ -12,10 +12,14 @@ Stop writing repetitive Docker build workflows. This GitHub Action automatically
 ## 🎯 Why Use This Action?
 
 **The Problem:**  
-Building containers across multiple branches with different tagging strategies is repetitive and error-prone. Teams waste time writing similar workflows for PRs, development, staging, and production.
+Building containers across multiple branches with different tagging strategies is repetitive and error-prone. Teams maintain separate workflows for PRs, development, staging, and production releases, leading to:
+- Duplicated build configurations
+- Inconsistent SBOM and provenance generation
+- Higher maintenance overhead
+- Complex workflow management
 
 **The Solution:**  
-One action that intelligently detects your workflow context and applies the right tags automatically. Whether it's a feature PR, a dev→main promotion, or an emergency hotfix, your containers get tagged correctly—every time.
+One unified action that intelligently handles ALL container build scenarios—from feature PRs to production releases. Whether it's a feature PR, a dev→main promotion, an emergency hotfix, or a versioned production release, your containers get built correctly with consistent security attestations—every time.
 
 ---
 
@@ -25,34 +29,39 @@ This action analyzes your GitHub workflow context and automatically determines t
 
 ```mermaid
 graph LR
-    A[Push/PR Event] --> B{Detect Context}
+    A[Push/PR/Release Event] --> B{Detect Context}
     B -->|PR → dev| C[pr-sha]
     B -->|dev → main| D[dev-sha]
     B -->|hotfix → main| E[patch-sha]
     B -->|push → main| F[staging-sha]
-    B -->|other| G[wip-sha]
-    C --> H[Build & Push]
-    D --> H
-    E --> H
-    F --> H
-    G --> H
-    H --> I[PR Comment]
+    B -->|release/tag| G[v1.2.3 + latest]
+    B -->|other| H[wip-sha]
+    C --> I[Build & Push]
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J[SBOM & Provenance]
+    J --> K[PR Comment/Outputs]
 ```
 
-**No manual configuration needed.** Just add the action to your workflow, and it handles branch detection, tagging, building, and PR comments automatically for all flow types—whether triggered by pull requests or direct pushes to tracked branches.
+**No manual configuration needed.** Just add the action to your workflow, and it handles branch detection, semantic versioning, tagging, building, SBOM generation, and PR comments automatically for all flow types—from development PRs to production releases.
 
 ---
 
 ## ✨ Features
 
-- 🎯 **Intelligent Flow Detection** - Automatically detects PR context and assigns appropriate build tags
+- 🎯 **Intelligent Flow Detection** - Automatically detects PR context, branches, and release events
+- 🎉 **Production Release Support** - Semantic versioning with automatic `latest` and major.minor tags
 - 🐳 **Dual Registry Support** - Push to Docker Hub, GHCR, or both simultaneously
-- 🏷️ **Smart Tagging Strategy** - `pr-{sha}`, `dev-{sha}`, `patch-{sha}`, `wip-{sha}` flows
+- 🏷️ **Smart Tagging Strategy** - `pr-{sha}`, `dev-{sha}`, `patch-{sha}`, `staging-{sha}`, `release` flows
 - 🔧 **Highly Configurable** - Customize branches, registries, build options, and more
-- 💬 **Smart PR Comments** - Automatic pull instructions posted to PRs for all flow types (push and pull_request events)
+- 💬 **Smart PR Comments** - Automatic pull instructions posted to PRs for all flow types
 - 🚀 **Multi-Platform Builds** - Support for `linux/amd64`, `linux/arm64`, and more
-- 🔐 **Security-First** - Built-in SBOM and provenance attestations
+- 🔐 **Security-First** - Built-in SBOM and provenance attestations for ALL builds
 - ⚡ **Build Cache** - GitHub Actions cache integration for faster builds
+- 🔄 **Unified Pipeline** - One action handles dev, staging, AND production releases
 
 ---
 
@@ -120,6 +129,7 @@ All flow types use **commit SHA** (first 7 characters) for tagging, ensuring tra
 | **DEV** | Pull Request from `dev` → `main` OR Push to `dev` branch | `dev-{sha}` | Development images |
 | **PATCH** | Pull Request → `main` (not from `dev`) | `patch-{sha}` | Hotfixes and emergency patches |
 | **STAGING** | Direct push to `main` branch (after PR merge) | `staging-{sha}` | Pre-production validation before release |
+| **RELEASE** | GitHub Release published OR Push of semantic version tag | `{version}`, `{major.minor}`, `latest` | Production releases with semantic versioning |
 | **WIP** | Other branches/commits | `wip-{sha}` | Work in progress experiments |
 
 > **Note:** The `{sha}` in each tag represents the **HEAD commit SHA** of the PR or push event, not the PR number. This ensures every build can be traced to its exact source code.
@@ -359,6 +369,95 @@ jobs:
 
 ---
 
+## 🎉 Production Release Workflow
+
+The action now provides **unified handling for all build scenarios**, including production releases with semantic versioning. This eliminates the need for separate release workflows while maintaining consistent SBOM and provenance generation.
+
+### Release Flow Features
+
+- **Semantic Version Tags:** Automatically detects and uses semantic versions (v1.2.3, v2.0.0-beta.1)
+- **Multiple Tags:** Generates version-specific, major.minor, and latest tags for stable releases
+- **SBOM & Provenance:** Built-in supply chain security for all releases
+- **Multi-arch Support:** Same build flow handles multi-platform releases
+- **Unified Pipeline:** One action handles dev, staging, AND production releases
+
+### Semantic Version Tag Formats
+
+The action recognizes these semantic version patterns:
+- `v1.2.3` - Standard version with 'v' prefix (recommended)
+- `1.2.3` - Version without prefix
+- `v2.0.0-beta.1` - Pre-release version (no 'latest' tag)
+- `v1.0.0+20241213` - Version with build metadata
+
+### Release Tagging Strategy
+
+For a release version `v1.2.3`, the action automatically generates:
+- `v1.2.3` - Exact version tag
+- `1.2` - Major.minor tag (e.g., `1.2`)
+- `latest` - Latest stable release tag
+
+> **Note:** Pre-release versions (with `-alpha`, `-beta`, `-rc` suffixes) only get the exact version tag, not `latest`.
+
+### Complete Release Workflow Example
+
+```yaml
+name: Unified Build & Release
+
+on:
+  # Development builds
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  
+  # Production releases
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write  # Required for SBOM/provenance attestations
+      pull-requests: write  # Required for PR comments
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up QEMU for Multi-arch
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Build and Push Container
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          registry: both
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+          # Multi-arch builds for releases, single-arch for dev
+          platforms: ${{ (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          
+          # Always enable SBOM and provenance for supply chain security
+          provenance: true
+          sbom: true
+```
+
+This single workflow now handles:
+- ✅ PR builds (`pr-{sha}`)
+- ✅ Dev builds (`dev-{sha}`)
+- ✅ Staging builds (`staging-{sha}`)
+- ✅ Production releases (`v1.2.3`, `1.2`, `latest`)
+- ✅ Consistent SBOM/provenance for all scenarios
+- ✅ Multi-arch support for production
+
+---
+
 ## 🔍 Examples
 
 ### Example 1: PR to Dev Branch
@@ -411,7 +510,54 @@ jobs:
 - **Tag:** `patch-def9012`
 - **Fast-tracked:** Emergency fix workflow
 
-### Example 6: Work in Progress
+### Example 6: Production Release
+
+**Context:** GitHub Release published with tag `v1.2.3` OR Push of semantic version tag
+
+**Result:**
+- **Flow Type:** `release`
+- **Tags:** 
+  - `v1.2.3` (exact version)
+  - `1.2` (major.minor for easy updates)
+  - `latest` (for stable releases)
+- **Multi-arch:** Recommended to use `platforms: linux/amd64,linux/arm64` for production
+- **SBOM & Provenance:** Automatically generated and attached
+
+**Workflow Example:**
+```yaml
+name: Production Release
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write  # For SBOM/provenance attestations
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build and Push Release
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          registry: both
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          platforms: linux/amd64,linux/arm64  # Multi-arch for production
+          provenance: true  # Supply chain security
+          sbom: true        # Software Bill of Materials
+```
+
+> **Production Best Practice:** After validating a `staging-{sha}` image, create a GitHub Release or push a semantic version tag (`v1.2.3`) pointing to the same commit. This triggers a production build with proper versioning and generates multiple tags for flexibility.
+
+### Example 7: Work in Progress
 
 **Context:** Push to `experiment/new-feature` branch
 
