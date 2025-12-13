@@ -104,7 +104,9 @@ sanitize_branch_name() {
 is_semver_tag() {
     local ref="$1"
     # Match semantic versioning patterns: v1.2.3, v1.2.3-beta.1, 1.2.3, etc.
-    if [[ "$ref" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
+    # Pre-release: -[a-zA-Z0-9.-]+ (allows dots and hyphens in identifiers)
+    # Build metadata: \+[a-zA-Z0-9.-]+ (plus sign escaped, allows dots and hyphens)
+    if [[ "$ref" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
         return 0
     fi
     return 1
@@ -121,6 +123,14 @@ extract_semver() {
         return 0
     fi
     return 1
+}
+
+# Sanitize version for Docker tag compatibility
+# Docker tags don't allow '+' character, so replace it with '-'
+sanitize_docker_tag() {
+    local tag="$1"
+    # Replace + with - for Docker compatibility
+    echo "${tag//+/-}"
 }
 
 # =============================================================================
@@ -312,8 +322,12 @@ detect_build_flow() {
     
     # For release flow, use version as primary tag and add additional tags
     if [ "$flow_type" = "release" ]; then
-        # Primary tag is the semantic version
-        base_tag="${short_sha}"
+        # Sanitize version for Docker compatibility (replace + with -)
+        local sanitized_version
+        sanitized_version=$(sanitize_docker_tag "${short_sha}")
+        
+        # Primary tag is the sanitized semantic version
+        base_tag="${sanitized_version}"
         full_tag="${TAG_PREFIX}${base_tag}${TAG_SUFFIX}"
         
         # Also generate 'latest' and major.minor tags for releases
@@ -324,9 +338,10 @@ detect_build_flow() {
         local version_no_v="${version#v}"
         
         # Only add additional tags for stable releases (no pre-release suffix)
-        if [[ ! "$version_no_v" =~ - ]]; then
-            # Extract major and major.minor versions
-            if [[ "$version_no_v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        # Check specifically for pre-release pattern (hyphen followed by identifier before optional build metadata)
+        if [[ ! "$version_no_v" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+ ]]; then
+            # Extract major.minor.patch components (ignoring build metadata with +)
+            if [[ "$version_no_v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
                 local major="${BASH_REMATCH[1]}"
                 local minor="${BASH_REMATCH[2]}"
                 
