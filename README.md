@@ -121,7 +121,9 @@ build:
 
 ## 📋 Build Flow Types
 
-All flow types use **commit SHA** (first 7 characters) for tagging, ensuring traceability back to the exact code that was built.
+All flow types use **commit SHA** (first 7 characters) for tagging, ensuring traceability back to the exact code that was built. Release flows use **semantic versions** instead of commit SHAs.
+
+> **Backward Compatibility:** All existing workflows continue to work without changes. The release flow is a new addition that doesn't affect existing PR, dev, patch, staging, or WIP flows.
 
 | Flow Type | Trigger | Tag Format | Use Case |
 |-----------|---------|------------|----------|
@@ -398,6 +400,8 @@ For a release version `v1.2.3`, the action automatically generates:
 
 > **Note:** Pre-release versions (with `-alpha`, `-beta`, `-rc` suffixes) only get the exact version tag, not `latest`.
 
+**Docker Tag Compatibility:** Build metadata with `+` characters (e.g., `v1.2.3+build.123`) is automatically sanitized to use `-` instead (becomes `v1.2.3-build.123`) for Docker compatibility.
+
 ### Complete Release Workflow Example
 
 ```yaml
@@ -609,6 +613,79 @@ context: ./app                     # Build context directory
   with:
     platforms: linux/amd64,linux/arm64
 ```
+
+---
+
+## 🔄 Migration Guide for Existing Users
+
+If you're currently using separate workflows for releases, you can now consolidate them into a single unified workflow.
+
+### Before: Separate Workflows
+
+```yaml
+# .github/workflows/build.yml - For dev/PR builds
+name: Build
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+# .github/workflows/release.yml - For production releases
+name: Release
+on:
+  release:
+    types: [published]
+```
+
+### After: Unified Workflow
+
+```yaml
+# .github/workflows/container.yml - Handles everything
+name: Container Build & Release
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+    tags:
+      - 'v*.*.*'
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up QEMU for Multi-arch
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Build and Push
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          registry: both
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          platforms: ${{ (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          provenance: true
+          sbom: true
+```
+
+### Benefits of Migration
+
+- ✅ **Single workflow** for all scenarios
+- ✅ **Consistent SBOM/provenance** across all builds
+- ✅ **Reduced maintenance** overhead
+- ✅ **Automatic semantic versioning** for releases
+- ✅ **Multi-arch support** for production
 
 ---
 
