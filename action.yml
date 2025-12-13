@@ -457,7 +457,7 @@ runs:
       continue-on-error: true
       with:
         scan-type: 'image'
-        image-ref: ${{ steps.meta.outputs.tags }}
+        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
         format: 'json'
         output: 'trivy-image-results.json'
         severity: ${{ inputs.trivy-severity }}
@@ -510,7 +510,7 @@ runs:
       continue-on-error: true
       with:
         scan-type: 'image'
-        image-ref: ${{ steps.meta.outputs.tags }}
+        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
         format: 'sarif'
         output: 'trivy-image-results.sarif'
         severity: ${{ inputs.trivy-severity }}
