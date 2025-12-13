@@ -252,7 +252,7 @@ runs:
         github-token: ${{ inputs.ghcr-token || github.token }}
         script: |
           const fs = require('fs');
-          const scriptPath = '${{ github.action_path }}/scripts/pr-comment.js';
+          const scriptPath = '${{ github.action_path }}/dist/pr-comment.js';
           const script = require(scriptPath);
           await script({github, context, core});
       env:
