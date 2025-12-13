@@ -212,8 +212,9 @@ docker run <your-options> <image>
           head: `${context.repo.owner}:${branch}`,
         });
         
-        if (prs.length > 0 && prs[0]) {
-          prNumber = prs[0].number;
+        const firstPR = prs[0];
+        if (firstPR) {
+          prNumber = firstPR.number;
           core.info(`✅ Found associated PR #${prNumber}`);
         } else {
           core.info('ℹ️  No open PRs found for this branch');
