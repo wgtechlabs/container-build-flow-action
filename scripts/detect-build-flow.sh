@@ -12,7 +12,8 @@
 #   - dev-{sha}     : Pull request from dev to main branch
 #   - patch-{sha}   : Pull request to main (not from dev)
 #   - staging-{sha} : Push to main branch (pre-production)
-#   - release-{version} : Production release (GitHub release or version tag)
+#   - release       : Production release (GitHub release or version tag)
+#                     Tags: {version}, {major.minor}, latest (e.g., v1.2.3, 1.2, latest)
 #   - wip-{sha}     : Work in progress (other branches)
 #
 # Usage:
@@ -142,8 +143,11 @@ is_prerelease_version() {
     local version="$1"
     # Remove 'v' prefix if present
     local version_no_v="${version#v}"
+    # First strip any build metadata (everything after +)
+    local version_no_build="${version_no_v%%+*}"
     # Check for pre-release pattern: major.minor.patch-identifier
-    if [[ "$version_no_v" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+ ]]; then
+    # This ensures we only check the version part, not the build metadata
+    if [[ "$version_no_build" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+$ ]]; then
         return 0
     fi
     return 1
