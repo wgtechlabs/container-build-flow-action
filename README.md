@@ -475,9 +475,51 @@ context: ./app                     # Build context directory
 
 ---
 
+## 🛠️ Development
+
+### Building the Action
+
+This action is written in TypeScript and must be compiled before use. The compiled JavaScript files are included in the repository under `dist/`.
+
+**Prerequisites:**
+- Node.js 18+ 
+- npm or yarn
+
+**Build Steps:**
+
+```bash
+# Install dependencies
+npm install
+
+# Build TypeScript to JavaScript
+npm run build
+
+# Clean and rebuild
+npm run rebuild
+```
+
+**TypeScript Configuration:**
+- Source files: `scripts/*.ts`
+- Compiled output: `dist/*.js`
+- TypeScript config: `tsconfig.json` (strict mode enabled)
+- Type definitions: `scripts/types.ts`
+
+**Important Notes:**
+- The `dist/` directory is committed to the repository (required for GitHub Actions)
+- Always run `npm run build` after making changes to TypeScript files
+- The action references compiled files in `dist/` directory via `action.yml`
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+When contributing code changes:
+1. Make changes to TypeScript files in `scripts/` directory
+2. Run `npm run build` to compile
+3. Test your changes thoroughly
+4. Commit both source TypeScript files and compiled JavaScript files
 
 ---
 
