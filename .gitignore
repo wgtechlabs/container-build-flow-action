@@ -18,6 +18,12 @@ yarn-error.log*
 # Dependencies
 node_modules/
 
+# Build outputs
+dist/
+*.d.ts
+*.d.ts.map
+*.js.map
+
 # Test files
 test/
 *.test.js

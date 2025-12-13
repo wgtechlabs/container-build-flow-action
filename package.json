@@ -1,0 +1,25 @@
+{
+  "name": "container-build-flow-action",
+  "version": "1.0.0",
+  "description": "Automated Docker/Container builds with PR/WIP/DEV/PATCH flow support for Docker Hub and GitHub Container Registry",
+  "main": "dist/pr-comment.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "github-actions",
+    "docker",
+    "container",
+    "build",
+    "ci-cd"
+  ],
+  "author": "WG Technology Labs",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}
