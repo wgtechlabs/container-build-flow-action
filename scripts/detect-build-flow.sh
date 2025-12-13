@@ -101,11 +101,14 @@ sanitize_branch_name() {
 }
 
 # Check if ref is a semantic version tag
+# Validates semantic versioning format per semver.org spec
 is_semver_tag() {
     local ref="$1"
-    # Match semantic versioning patterns: v1.2.3, v1.2.3-beta.1, 1.2.3, etc.
-    # Pre-release: -[a-zA-Z0-9.-]+ (allows dots and hyphens in identifiers)
-    # Build metadata: \+[a-zA-Z0-9.-]+ (plus sign escaped, allows dots and hyphens)
+    # Semantic version pattern breakdown:
+    #   ^v?                           - Optional 'v' prefix
+    #   [0-9]+\.[0-9]+\.[0-9]+        - Required major.minor.patch (e.g., 1.2.3)
+    #   (-[a-zA-Z0-9.-]+)?            - Optional pre-release (e.g., -beta.1, -rc-2)
+    #   (\+[a-zA-Z0-9.-]+)?$          - Optional build metadata (e.g., +build.123)
     if [[ "$ref" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
         return 0
     fi
@@ -131,6 +134,35 @@ sanitize_docker_tag() {
     local tag="$1"
     # Replace + with - for Docker compatibility
     echo "${tag//+/-}"
+}
+
+# Check if version is a pre-release (contains pre-release identifier)
+# Pre-release versions have a hyphen followed by identifier before optional build metadata
+is_prerelease_version() {
+    local version="$1"
+    # Remove 'v' prefix if present
+    local version_no_v="${version#v}"
+    # Check for pre-release pattern: major.minor.patch-identifier
+    if [[ "$version_no_v" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+ ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Extract major and minor version components
+# Returns "major.minor" from version string (e.g., "1.2" from "v1.2.3")
+extract_major_minor() {
+    local version="$1"
+    # Remove 'v' prefix if present
+    local version_no_v="${version#v}"
+    # Extract major.minor.patch (ignoring build metadata after +)
+    if [[ "$version_no_v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+        local major="${BASH_REMATCH[1]}"
+        local minor="${BASH_REMATCH[2]}"
+        echo "${major}.${minor}"
+        return 0
+    fi
+    return 1
 }
 
 # =============================================================================
@@ -334,19 +366,15 @@ detect_build_flow() {
         local version="${short_sha}"
         local additional_tags=""
         
-        # Extract major.minor.patch components (removing 'v' prefix if present)
-        local version_no_v="${version#v}"
-        
         # Only add additional tags for stable releases (no pre-release suffix)
-        # Check specifically for pre-release pattern (hyphen followed by identifier before optional build metadata)
-        if [[ ! "$version_no_v" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+ ]]; then
-            # Extract major.minor.patch components (ignoring build metadata with +)
-            if [[ "$version_no_v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
-                local major="${BASH_REMATCH[1]}"
-                local minor="${BASH_REMATCH[2]}"
-                
+        if ! is_prerelease_version "$version"; then
+            # Extract major.minor version
+            local major_minor
+            major_minor=$(extract_major_minor "$version")
+            
+            if [ -n "$major_minor" ]; then
                 # Add major.minor tag
-                additional_tags="${TAG_PREFIX}${major}.${minor}${TAG_SUFFIX}"
+                additional_tags="${TAG_PREFIX}${major_minor}${TAG_SUFFIX}"
                 
                 # Add 'latest' tag for stable releases
                 additional_tags="${additional_tags},${TAG_PREFIX}latest${TAG_SUFFIX}"
