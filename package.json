@@ -4,7 +4,12 @@
   "description": "Automated Docker/Container builds with PR/WIP/DEV/PATCH flow support for Docker Hub and GitHub Container Registry",
   "main": "dist/pr-comment.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:tsc && npm run build:bundle",
+    "build:tsc": "tsc",
+    "build:bundle": "npm run bundle:parse-trivy && npm run bundle:generate-comparison && npm run bundle:pr-comment",
+    "bundle:parse-trivy": "ncc build dist/parse-trivy-results.js -o dist/parse-trivy-results -m",
+    "bundle:generate-comparison": "ncc build dist/generate-comparison.js -o dist/generate-comparison -m",
+    "bundle:pr-comment": "ncc build dist/pr-comment.js -o dist/pr-comment -m",
     "clean": "rm -rf dist",
     "rebuild": "npm run clean && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -20,6 +25,10 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.1",
+    "@vercel/ncc": "^0.38.3",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1"
   }
 }

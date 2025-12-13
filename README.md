@@ -501,13 +501,25 @@ npm run rebuild
 **TypeScript Configuration:**
 - Source files: `scripts/*.ts`
 - Compiled output: `dist/*.js`
+- Bundled outputs: `dist/*/index.js` (self-contained with all dependencies)
 - TypeScript config: `tsconfig.json` (strict mode enabled)
 - Type definitions: `scripts/types.ts`
+
+**Build Process:**
+1. **TypeScript Compilation** (`npm run build:tsc`): Compiles `.ts` → `.js` files
+2. **Dependency Bundling** (`npm run build:bundle`): Bundles with `@vercel/ncc` to create self-contained files
+   - `dist/parse-trivy-results/index.js` - Bundled Trivy parser (~480KB)
+   - `dist/generate-comparison/index.js` - Bundled comparison generator (~480KB)
+   - `dist/pr-comment/index.js` - Bundled PR comment script (~5KB)
+
+**Why Bundling?**
+Scripts using `@actions/core` require bundling because GitHub Actions doesn't run `npm install` when executing actions. The bundler (`@vercel/ncc`) packages all Node.js dependencies into single files.
 
 **Important Notes:**
 - The `dist/` directory is committed to the repository (required for GitHub Actions)
 - Always run `npm run build` after making changes to TypeScript files
-- The action references compiled files in `dist/` directory via `action.yml`
+- The action references bundled files in `dist/*/index.js` via `action.yml`
+- Bundled files are self-contained and don't require `node_modules/`
 
 ---
 

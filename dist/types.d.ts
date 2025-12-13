@@ -94,4 +94,67 @@ export interface PRCommentEnv {
     REGISTRY: 'docker-hub' | 'ghcr' | 'both';
     RESOLVED_SHA: string;
 }
+export interface TrivyVulnerability {
+    VulnerabilityID?: string;
+    PkgName?: string;
+    InstalledVersion?: string;
+    FixedVersion?: string;
+    Severity?: string;
+    Title?: string;
+    Description?: string;
+}
+export interface TrivyResult {
+    Target?: string;
+    Class?: string;
+    Type?: string;
+    Vulnerabilities?: TrivyVulnerability[];
+    Misconfigurations?: unknown[];
+}
+export interface TrivyScanResults {
+    SchemaVersion?: number;
+    ArtifactName?: string;
+    ArtifactType?: string;
+    Metadata?: Record<string, unknown>;
+    Results?: TrivyResult[];
+}
+export interface VulnerabilityCounts {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    unknown: number;
+    total: number;
+}
+export interface VulnerabilitySummary extends VulnerabilityCounts {
+    completed: boolean;
+}
+export interface ProcessedVulnerability {
+    id: string;
+    package: string;
+    version: string;
+    severity: string;
+    title: string;
+    description: string;
+    fixedVersion: string;
+}
+export interface ComparisonSection {
+    total: number;
+    counts: VulnerabilityCounts;
+    vulnerabilities: ProcessedVulnerability[];
+}
+export interface VulnerabilityComparison {
+    comparison_available: boolean;
+    message?: string;
+    baseline?: {
+        total: number;
+        vulnerabilities: ProcessedVulnerability[];
+    };
+    current?: {
+        total: number;
+        vulnerabilities: ProcessedVulnerability[];
+    };
+    new?: ComparisonSection;
+    fixed?: ComparisonSection;
+    unchanged?: ComparisonSection;
+}
 //# sourceMappingURL=types.d.ts.map
