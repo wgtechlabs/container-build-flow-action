@@ -134,6 +134,92 @@ inputs:
     description: 'Enable SBOM attestation'
     required: false
     default: 'true'
+  
+  # Security Scanning Configuration
+  pre-build-scan-enabled:
+    description: 'Enable pre-build security scanning (source code + Dockerfile)'
+    required: false
+    default: 'true'
+  
+  scan-source-code:
+    description: 'Scan source code and dependencies before building'
+    required: false
+    default: 'true'
+  
+  scan-dockerfile:
+    description: 'Scan Dockerfile for misconfigurations and best practices'
+    required: false
+    default: 'true'
+  
+  image-scan-enabled:
+    description: 'Enable post-build container image scanning'
+    required: false
+    default: 'true'
+  
+  trivy-severity:
+    description: 'Trivy severity levels to scan (comma-separated: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL)'
+    required: false
+    default: 'HIGH,CRITICAL'
+  
+  trivy-ignore-unfixed:
+    description: 'Ignore vulnerabilities without available fixes'
+    required: false
+    default: 'false'
+  
+  trivy-timeout:
+    description: 'Trivy scan timeout duration (e.g., 5m0s, 10m0s)'
+    required: false
+    default: '10m0s'
+  
+  trivy-skip-dirs:
+    description: 'Directories to skip during Trivy scan (comma-separated)'
+    required: false
+    default: ''
+  
+  trivy-skip-files:
+    description: 'Files to skip during Trivy scan (comma-separated)'
+    required: false
+    default: ''
+  
+  upload-sarif:
+    description: 'Upload vulnerability scan results to GitHub Security tab (SARIF format)'
+    required: false
+    default: 'true'
+  
+  sarif-category-source:
+    description: 'SARIF category name for source code scan'
+    required: false
+    default: 'trivy-source-scan'
+  
+  sarif-category-dockerfile:
+    description: 'SARIF category name for Dockerfile scan'
+    required: false
+    default: 'trivy-dockerfile-scan'
+  
+  sarif-category-image:
+    description: 'SARIF category name for container image scan'
+    required: false
+    default: 'trivy-container-scan'
+  
+  vulnerability-comment-enabled:
+    description: 'Add comprehensive vulnerability scan results to PR comments'
+    required: false
+    default: 'true'
+  
+  enable-image-comparison:
+    description: 'Compare vulnerabilities with baseline image'
+    required: false
+    default: 'false'
+  
+  comparison-baseline-image:
+    description: 'Baseline image tag to compare against (e.g., myapp:latest)'
+    required: false
+    default: ''
+  
+  fail-on-vulnerability:
+    description: 'Fail the build if vulnerabilities are found at or above trivy-severity level'
+    required: false
+    default: 'false'
 
 outputs:
   image-tags:
@@ -155,6 +241,31 @@ outputs:
   short-sha:
     description: 'Short commit SHA used in tags'
     value: ${{ steps.output.outputs.short-sha }}
+  
+  # Security Scanning Outputs
+  vulnerability-scan-completed:
+    description: 'Whether vulnerability scanning completed successfully (true/false)'
+    value: ${{ steps.scan-summary.outputs.completed }}
+  
+  total-vulnerabilities:
+    description: 'Total number of vulnerabilities found'
+    value: ${{ steps.scan-summary.outputs.total }}
+  
+  critical-vulnerabilities:
+    description: 'Number of CRITICAL severity vulnerabilities'
+    value: ${{ steps.scan-summary.outputs.critical }}
+  
+  high-vulnerabilities:
+    description: 'Number of HIGH severity vulnerabilities'
+    value: ${{ steps.scan-summary.outputs.high }}
+  
+  medium-vulnerabilities:
+    description: 'Number of MEDIUM severity vulnerabilities'
+    value: ${{ steps.scan-summary.outputs.medium }}
+  
+  low-vulnerabilities:
+    description: 'Number of LOW severity vulnerabilities'
+    value: ${{ steps.scan-summary.outputs.low }}
 
 runs:
   using: 'composite'
@@ -184,6 +295,84 @@ runs:
     
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+    
+    # =============================================================================
+    # PRE-BUILD SECURITY SCANNING
+    # =============================================================================
+    
+    - name: Run Trivy Filesystem Scan (Source Code)
+      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true'
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'fs'
+        scan-ref: ${{ inputs.context }}
+        format: 'json'
+        output: 'trivy-source-results.json'
+        severity: ${{ inputs.trivy-severity }}
+        ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+        timeout: ${{ inputs.trivy-timeout }}
+        skip-dirs: ${{ inputs.trivy-skip-dirs }}
+        skip-files: ${{ inputs.trivy-skip-files }}
+    
+    - name: Upload Source Code Scan to GitHub Security
+      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true'
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'fs'
+        scan-ref: ${{ inputs.context }}
+        format: 'sarif'
+        output: 'trivy-source-results.sarif'
+        severity: ${{ inputs.trivy-severity }}
+        ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+        timeout: ${{ inputs.trivy-timeout }}
+        skip-dirs: ${{ inputs.trivy-skip-dirs }}
+        skip-files: ${{ inputs.trivy-skip-files }}
+    
+    - name: Upload Source Scan SARIF
+      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: 'trivy-source-results.sarif'
+        category: ${{ inputs.sarif-category-source }}
+    
+    - name: Run Trivy Config Scan (Dockerfile)
+      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true'
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'config'
+        scan-ref: ${{ inputs.dockerfile }}
+        format: 'json'
+        output: 'trivy-dockerfile-results.json'
+        severity: ${{ inputs.trivy-severity }}
+        timeout: ${{ inputs.trivy-timeout }}
+    
+    - name: Upload Dockerfile Scan to GitHub Security
+      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true'
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'config'
+        scan-ref: ${{ inputs.dockerfile }}
+        format: 'sarif'
+        output: 'trivy-dockerfile-results.sarif'
+        severity: ${{ inputs.trivy-severity }}
+        timeout: ${{ inputs.trivy-timeout }}
+    
+    - name: Upload Dockerfile Scan SARIF
+      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: 'trivy-dockerfile-results.sarif'
+        category: ${{ inputs.sarif-category-dockerfile }}
+    
+    # =============================================================================
+    # BUILD STAGE
+    # =============================================================================
     
     - name: Login to Docker Hub
       if: inputs.registry == 'docker-hub' || inputs.registry == 'both'
@@ -245,6 +434,101 @@ runs:
         SHORT_SHA: ${{ steps.detect.outputs.short-sha }}
         REGISTRY: ${{ inputs.registry }}
     
+    # =============================================================================
+    # POST-BUILD SECURITY SCANNING
+    # =============================================================================
+    
+    - name: Scan Baseline Image (for comparison)
+      if: inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != ''
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'image'
+        image-ref: ${{ inputs.comparison-baseline-image }}
+        format: 'json'
+        output: 'trivy-baseline-results.json'
+        severity: ${{ inputs.trivy-severity }}
+        ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+        timeout: ${{ inputs.trivy-timeout }}
+    
+    - name: Scan Container Image
+      if: inputs.image-scan-enabled == 'true'
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'image'
+        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        format: 'json'
+        output: 'trivy-image-results.json'
+        severity: ${{ inputs.trivy-severity }}
+        ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+        timeout: ${{ inputs.trivy-timeout }}
+    
+    - name: Parse Trivy Results and Generate Summary
+      if: inputs.image-scan-enabled == 'true'
+      id: scan-summary
+      shell: bash
+      run: |
+        node ${{ github.action_path }}/scripts/parse-trivy-results.js
+    
+    - name: Generate Vulnerability Comparison
+      if: inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true'
+      shell: bash
+      continue-on-error: true
+      run: |
+        node ${{ github.action_path }}/scripts/generate-comparison.js
+    
+    - name: Check Vulnerability Threshold
+      if: inputs.image-scan-enabled == 'true' && inputs.fail-on-vulnerability == 'true'
+      shell: bash
+      run: |
+        if [ -f trivy-scan-summary.json ]; then
+          CRITICAL=$(jq -r '.critical // 0' trivy-scan-summary.json)
+          HIGH=$(jq -r '.high // 0' trivy-scan-summary.json)
+          
+          echo "Critical vulnerabilities: $CRITICAL"
+          echo "High vulnerabilities: $HIGH"
+          
+          if [[ "${{ inputs.trivy-severity }}" == *"CRITICAL"* ]] && [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ Build failed: $CRITICAL CRITICAL vulnerabilities found"
+            exit 1
+          fi
+          
+          if [[ "${{ inputs.trivy-severity }}" == *"HIGH"* ]] && [ "$HIGH" -gt 0 ]; then
+            echo "❌ Build failed: $HIGH HIGH vulnerabilities found"
+            exit 1
+          fi
+          
+          echo "✅ No vulnerabilities above threshold found"
+        else
+          echo "⚠️ Scan summary not found, skipping threshold check"
+        fi
+    
+    - name: Upload Container Image Scan to GitHub Security
+      if: inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true'
+      uses: aquasecurity/trivy-action@0.33.1
+      continue-on-error: true
+      with:
+        scan-type: 'image'
+        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        format: 'sarif'
+        output: 'trivy-image-results.sarif'
+        severity: ${{ inputs.trivy-severity }}
+        ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+        timeout: ${{ inputs.trivy-timeout }}
+    
+    - name: Upload Image Scan SARIF
+      if: inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: 'trivy-image-results.sarif'
+        category: ${{ inputs.sarif-category-image }}
+    
+    # =============================================================================
+    # PR COMMENT WITH SECURITY RESULTS
+    # =============================================================================
+    
     - name: Comment on Pull Request
       if: inputs.pr-comment-enabled == 'true'
       uses: actions/github-script@v7
@@ -262,3 +546,7 @@ runs:
         PR_COMMENT_TEMPLATE: ${{ inputs.pr-comment-template }}
         REGISTRY: ${{ inputs.registry }}
         RESOLVED_SHA: ${{ steps.sha.outputs.sha }}
+        VULNERABILITY_COMMENT_ENABLED: ${{ inputs.vulnerability-comment-enabled }}
+        PRE_BUILD_SCAN_ENABLED: ${{ inputs.pre-build-scan-enabled }}
+        IMAGE_SCAN_ENABLED: ${{ inputs.image-scan-enabled }}
+        ENABLE_IMAGE_COMPARISON: ${{ inputs.enable-image-comparison }}

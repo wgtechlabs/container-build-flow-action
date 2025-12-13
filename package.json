@@ -1,0 +1,19 @@
+{
+  "name": "container-build-flow-action",
+  "version": "1.0.0",
+  "description": "Automated Docker/Container builds with PR/WIP/DEV/PATCH flow support",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "github-actions",
+    "docker",
+    "container",
+    "build"
+  ],
+  "author": "WG Technology Labs",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.10.1"
+  }
+}

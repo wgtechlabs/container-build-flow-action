@@ -1,0 +1,61 @@
+name: Strict Security Scanning
+
+# Strict security configuration that fails builds when vulnerabilities are found
+# This workflow demonstrates security-first approach with failure on vulnerabilities
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build and Push Container with Strict Security
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          # Registry credentials
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+          # Strict security configuration
+          pre-build-scan-enabled: true
+          scan-source-code: true
+          scan-dockerfile: true
+          image-scan-enabled: true
+          
+          # Only scan for HIGH and CRITICAL vulnerabilities
+          trivy-severity: HIGH,CRITICAL
+          
+          # Ignore vulnerabilities without fixes available
+          trivy-ignore-unfixed: true
+          
+          # Fail the build if HIGH or CRITICAL vulnerabilities are found
+          fail-on-vulnerability: true
+          
+          # Upload results to GitHub Security tab
+          upload-sarif: true
+          
+          # Add detailed vulnerability information to PR comments
+          vulnerability-comment-enabled: true
+          
+          # Increase timeout for thorough scanning
+          trivy-timeout: 15m0s
+      
+      - name: Post-build notification
+        if: success()
+        run: |
+          echo "✅ Build passed strict security checks!"
+          echo "No HIGH or CRITICAL vulnerabilities found."
