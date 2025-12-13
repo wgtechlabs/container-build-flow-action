@@ -241,7 +241,6 @@ module.exports = async ({github, context, core}) => {
                         }
                       }
                     });
-                  }
                   
                   securitySection += '\n</details>\n\n';
                 } catch (e) {
