@@ -104,13 +104,12 @@ module.exports = async ({github, context, core}) => {
           try {
             const sourceResults = JSON.parse(fs.readFileSync('trivy-source-results.json', 'utf8'));
             let sourceVulnCount = 0;
-            if (sourceResults.Results) {
-              sourceResults.Results.forEach(result => {
-                if (result.Vulnerabilities) {
-                  sourceVulnCount += result.Vulnerabilities.length;
-                }
-              });
-            }
+            const sourceVulnerabilities = Array.isArray(sourceResults.Results) ? sourceResults.Results : [];
+            sourceVulnerabilities.forEach(result => {
+              if (result.Vulnerabilities) {
+                sourceVulnCount += result.Vulnerabilities.length;
+              }
+            });
             preBuildChecks.push(`✅ **Source Code Scan:** ${sourceVulnCount} vulnerabilities found`);
           } catch (e) {
             preBuildChecks.push('⚠️ **Source Code Scan:** Completed (results unavailable)');
@@ -122,13 +121,12 @@ module.exports = async ({github, context, core}) => {
           try {
             const dockerfileResults = JSON.parse(fs.readFileSync('trivy-dockerfile-results.json', 'utf8'));
             let dockerfileIssues = 0;
-            if (dockerfileResults.Results) {
-              dockerfileResults.Results.forEach(result => {
-                if (result.Misconfigurations) {
-                  dockerfileIssues += result.Misconfigurations.length;
-                }
-              });
-            }
+            const dockerfileMisconfigurations = Array.isArray(dockerfileResults.Results) ? dockerfileResults.Results : [];
+            dockerfileMisconfigurations.forEach(result => {
+              if (result.Misconfigurations) {
+                dockerfileIssues += result.Misconfigurations.length;
+              }
+            });
             preBuildChecks.push(`✅ **Dockerfile Scan:** ${dockerfileIssues} misconfigurations found`);
           } catch (e) {
             preBuildChecks.push('⚠️ **Dockerfile Scan:** Completed (results unavailable)');
@@ -208,11 +206,11 @@ module.exports = async ({github, context, core}) => {
               if (summary.total > 0 && fs.existsSync('trivy-image-results.json')) {
                 try {
                   const results = JSON.parse(fs.readFileSync('trivy-image-results.json', 'utf8'));
-                  
+
                   securitySection += '<details>\n<summary>📋 View Vulnerability Details</summary>\n\n';
-                  
-                  if (results.Results) {
-                    results.Results.forEach((result, idx) => {
+
+                  const imageResults = Array.isArray(results.Results) ? results.Results : [];
+                  imageResults.forEach((result, idx) => {
                       if (result.Vulnerabilities && result.Vulnerabilities.length > 0) {
                         securitySection += `\n**${result.Target || 'Package'}**\n\n`;
                         
