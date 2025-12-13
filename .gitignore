@@ -18,6 +18,11 @@ yarn-error.log*
 # Dependencies
 node_modules/
 
+# Build outputs (keep dist/ for GitHub Actions)
+# dist/ is intentionally committed for action usage
+*.d.ts.map
+*.js.map
+
 # Test files
 test/
 *.test.js
