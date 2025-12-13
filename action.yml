@@ -1,5 +1,5 @@
 name: 'Container Build Flow Action'
-description: 'Automated Docker/Container builds with PR/WIP/DEV/PATCH flow support for Docker Hub and GitHub Container Registry'
+description: 'Automated Docker/Container builds with PR/DEV/PATCH/STAGING/RELEASE flow support for Docker Hub and GitHub Container Registry. Unified pipeline for development and production with SBOM & provenance.'
 author: 'WG Technology Labs'
 
 branding:
@@ -149,7 +149,7 @@ outputs:
     value: ${{ steps.output.outputs.build-digest }}
   
   build-flow-type:
-    description: 'Detected build flow type (pr, dev, patch, staging, wip)'
+    description: 'Detected build flow type (pr, dev, patch, staging, release, wip)'
     value: ${{ steps.output.outputs.build-flow-type }}
   
   short-sha:

@@ -12,6 +12,8 @@
 #   - dev-{sha}     : Pull request from dev to main branch
 #   - patch-{sha}   : Pull request to main (not from dev)
 #   - staging-{sha} : Push to main branch (pre-production)
+#   - release       : Production release (GitHub release or version tag)
+#                     Tags: {version}, {major.minor}, latest (e.g., v1.2.3, 1.2, latest)
 #   - wip-{sha}     : Work in progress (other branches)
 #
 # Usage:
@@ -35,6 +37,8 @@ set -euo pipefail
 # GitHub context (automatically provided by Actions)
 GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-}"
 GITHUB_REF="${GITHUB_REF:-}"
+GITHUB_REF_TYPE="${GITHUB_REF_TYPE:-}"
+GITHUB_REF_NAME="${GITHUB_REF_NAME:-}"
 GITHUB_SHA="${GITHUB_SHA:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
 GITHUB_HEAD_REF="${GITHUB_HEAD_REF:-}"
@@ -97,6 +101,74 @@ sanitize_branch_name() {
     echo "$branch" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g' | tr '[:upper:]' '[:lower:]'
 }
 
+# Check if ref is a semantic version tag
+# Validates semantic versioning format per semver.org spec
+is_semver_tag() {
+    local ref="$1"
+    # Semantic version pattern breakdown:
+    #   ^v?                           - Optional 'v' prefix
+    #   [0-9]+\.[0-9]+\.[0-9]+        - Required major.minor.patch (e.g., 1.2.3)
+    #   (-[a-zA-Z0-9.-]+)?            - Optional pre-release (e.g., -beta.1, -rc-2)
+    #   (\+[a-zA-Z0-9.-]+)?$          - Optional build metadata (e.g., +build.123)
+    if [[ "$ref" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Extract semantic version from tag
+extract_semver() {
+    local ref="$1"
+    # Remove refs/tags/ prefix if present
+    ref="${ref#refs/tags/}"
+    # Return the version as-is if it's a semver
+    if is_semver_tag "$ref"; then
+        echo "$ref"
+        return 0
+    fi
+    return 1
+}
+
+# Sanitize version for Docker tag compatibility
+# Docker tags don't allow '+' character, so replace it with '-'
+sanitize_docker_tag() {
+    local tag="$1"
+    # Replace + with - for Docker compatibility
+    echo "${tag//+/-}"
+}
+
+# Check if version is a pre-release (contains pre-release identifier)
+# Pre-release versions have a hyphen followed by identifier before optional build metadata
+is_prerelease_version() {
+    local version="$1"
+    # Remove 'v' prefix if present
+    local version_no_v="${version#v}"
+    # First strip any build metadata (everything after +)
+    local version_no_build="${version_no_v%%+*}"
+    # Check for pre-release pattern: major.minor.patch-identifier
+    # This ensures we only check the version part, not the build metadata
+    if [[ "$version_no_build" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+$ ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Extract major and minor version components
+# Returns "major.minor" from version string (e.g., "1.2" from "v1.2.3")
+extract_major_minor() {
+    local version="$1"
+    # Remove 'v' prefix if present
+    local version_no_v="${version#v}"
+    # Extract major.minor.patch (ignoring build metadata after +)
+    if [[ "$version_no_v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+        local major="${BASH_REMATCH[1]}"
+        local minor="${BASH_REMATCH[2]}"
+        echo "${major}.${minor}"
+        return 0
+    fi
+    return 1
+}
+
 # =============================================================================
 # IMAGE NAME RESOLUTION
 # =============================================================================
@@ -128,6 +200,8 @@ detect_build_flow() {
     log_debug "GitHub Context:"
     log_debug "  Event: ${GITHUB_EVENT_NAME}"
     log_debug "  Ref: ${GITHUB_REF}"
+    log_debug "  Ref Type: ${GITHUB_REF_TYPE:-<not set>}"
+    log_debug "  Ref Name: ${GITHUB_REF_NAME:-<not set>}"
     log_debug "  Head Ref: ${GITHUB_HEAD_REF:-<not set>}"
     log_debug "  Base Ref: ${GITHUB_BASE_REF:-<not set>}"
     log_debug "  SHA: ${GITHUB_SHA}"
@@ -145,7 +219,75 @@ detect_build_flow() {
     # FLOW DETECTION ALGORITHM
     # =============================================================================
     
-    if [ "$GITHUB_EVENT_NAME" = "pull_request" ] || [ "$GITHUB_EVENT_NAME" = "pull_request_target" ]; then
+    # Check for release events first (highest priority for production)
+    if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+        log_info "Release event detected"
+        
+        # For release events, check if the tag is a semantic version
+        local release_tag="${GITHUB_REF#refs/tags/}"
+        log_debug "  Release tag: ${release_tag}"
+        
+        if is_semver_tag "$release_tag"; then
+            flow_type="release"
+            # Use the semantic version as the tag
+            local version
+            version=$(extract_semver "$release_tag")
+            log_success "Flow: Production release with semantic version"
+            log_debug "  Version: ${version}"
+            
+            # Override short_sha with version for release tags
+            short_sha="$version"
+        else
+            # Non-semver release tag - treat as WIP
+            flow_type="wip"
+            log_warning "Flow: Release with non-semantic version tag"
+        fi
+        
+    # Check for version tag pushes (create events)
+    elif [ "$GITHUB_EVENT_NAME" = "create" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
+        log_info "Tag creation event detected"
+        
+        local tag_name="${GITHUB_REF_NAME}"
+        log_debug "  Tag name: ${tag_name}"
+        
+        if is_semver_tag "$tag_name"; then
+            flow_type="release"
+            local version
+            version=$(extract_semver "$tag_name")
+            log_success "Flow: Production release via tag creation"
+            log_debug "  Version: ${version}"
+            
+            # Override short_sha with version for release tags
+            short_sha="$version"
+        else
+            # Non-semver tag - treat as WIP
+            flow_type="wip"
+            log_warning "Flow: Non-semantic version tag"
+        fi
+        
+    # Check for push events on tags (when tag is pushed directly)
+    elif [ "$GITHUB_EVENT_NAME" = "push" ] && [[ "$GITHUB_REF" =~ ^refs/tags/ ]]; then
+        log_info "Push to tag detected"
+        
+        local tag_name="${GITHUB_REF#refs/tags/}"
+        log_debug "  Tag name: ${tag_name}"
+        
+        if is_semver_tag "$tag_name"; then
+            flow_type="release"
+            local version
+            version=$(extract_semver "$tag_name")
+            log_success "Flow: Production release via tag push"
+            log_debug "  Version: ${version}"
+            
+            # Override short_sha with version for release tags
+            short_sha="$version"
+        else
+            # Non-semver tag - treat as WIP
+            flow_type="wip"
+            log_warning "Flow: Non-semantic version tag push"
+        fi
+        
+    elif [ "$GITHUB_EVENT_NAME" = "pull_request" ] || [ "$GITHUB_EVENT_NAME" = "pull_request_target" ]; then
         log_info "Pull request detected"
         
         # Extract base and head branch names
@@ -211,8 +353,47 @@ detect_build_flow() {
     
     log_info "Generating container tags..."
     
-    local base_tag="${flow_type}-${short_sha}"
-    local full_tag="${TAG_PREFIX}${base_tag}${TAG_SUFFIX}"
+    local base_tag
+    local full_tag
+    
+    # For release flow, use version as primary tag and add additional tags
+    if [ "$flow_type" = "release" ]; then
+        # Sanitize version for Docker compatibility (replace + with -)
+        local sanitized_version
+        sanitized_version=$(sanitize_docker_tag "${short_sha}")
+        
+        # Primary tag is the sanitized semantic version
+        base_tag="${sanitized_version}"
+        full_tag="${TAG_PREFIX}${base_tag}${TAG_SUFFIX}"
+        
+        # Also generate 'latest' and major.minor tags for releases
+        local version="${short_sha}"
+        local additional_tags=""
+        
+        # Only add additional tags for stable releases (no pre-release suffix)
+        if ! is_prerelease_version "$version"; then
+            # Extract major.minor version
+            local major_minor
+            major_minor=$(extract_major_minor "$version")
+            
+            if [ -n "$major_minor" ]; then
+                # Add major.minor tag
+                additional_tags="${TAG_PREFIX}${major_minor}${TAG_SUFFIX}"
+                
+                # Add 'latest' tag for stable releases
+                additional_tags="${additional_tags},${TAG_PREFIX}latest${TAG_SUFFIX}"
+            fi
+        fi
+        
+        # Combine primary tag with additional tags
+        if [ -n "$additional_tags" ]; then
+            full_tag="${full_tag},${additional_tags}"
+        fi
+    else
+        # For non-release flows, use the standard flow-sha format
+        base_tag="${flow_type}-${short_sha}"
+        full_tag="${TAG_PREFIX}${base_tag}${TAG_SUFFIX}"
+    fi
     
     log_debug "  Base tag: ${base_tag}"
     log_debug "  Full tag: ${full_tag}"
