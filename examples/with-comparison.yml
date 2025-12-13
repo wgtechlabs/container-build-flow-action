@@ -42,8 +42,11 @@ jobs:
           trivy-timeout: 10m0s
           
           # Enable vulnerability comparison with baseline
+          # Replace myorg/myapp:latest with your actual registry image
+          # For Docker Hub: orgname/imagename:latest
+          # For GHCR: ghcr.io/orgname/imagename:latest
           enable-image-comparison: true
-          comparison-baseline-image: ${{ github.repository }}:latest
+          comparison-baseline-image: myorg/myapp:latest
           
           # Upload SARIF results with custom categories
           upload-sarif: true
