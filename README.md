@@ -55,6 +55,9 @@ graph LR
 - 🔒 **Built-in Security Scanning** - Comprehensive vulnerability scanning with Trivy (source code, Dockerfile, and container images)
 - ⚡ **Build Cache** - GitHub Actions cache integration for faster builds
 
+> [!NOTE]
+> Security scanning is **enabled by default** with built-in optimizations: intelligent caching, fallback registries (`mirror.gcr.io`), and minimal overhead (~2-5 min). First run downloads the vulnerability database; subsequent scans use cached data.
+
 ---
 
 ## 💡 Before & After
