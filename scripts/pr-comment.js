@@ -18,6 +18,9 @@
  *   REGISTRY             : Target registry config
  */
 
+const fs = require('fs');
+const path = require('path');
+
 module.exports = async ({github, context, core}) => {
   try {
     // =============================================================================
@@ -30,6 +33,16 @@ module.exports = async ({github, context, core}) => {
     const customTemplate = process.env.PR_COMMENT_TEMPLATE || '';
     const registry = process.env.REGISTRY || 'both';
     const resolvedSha = process.env.RESOLVED_SHA || context.sha;
+    
+    // Read version from package.json
+    let actionVersion = '1.0.0'; // fallback version
+    try {
+      const packageJsonPath = path.join(__dirname, '..', 'package.json');
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+      actionVersion = packageJson.version || actionVersion;
+    } catch (error) {
+      core.debug(`Could not read version from package.json: ${error.message}`);
+    }
     
     // Security scanning environment variables
     const vulnerabilityCommentEnabled = process.env.VULNERABILITY_COMMENT_ENABLED || 'true';
@@ -90,7 +103,6 @@ module.exports = async ({github, context, core}) => {
         return '';
       }
       
-      const fs = require('fs');
       let securitySection = '\n---\n\n## 🔒 Security Scan Results\n\n';
       
       // Pre-build scan results
@@ -358,7 +370,7 @@ docker run <your-options> <image>
 ${securitySection}
 ---
 
-<sub>🤖 Powered by [Container Build Flow Action](https://github.com/wgtechlabs/container-build-flow-action)  
+<sub>🤖 Powered by [Container Build Flow Action](https://github.com/wgtechlabs/container-build-flow-action) v${actionVersion}  
 💻 with ❤️ by [Waren Gonzaga](https://warengonzaga.com) under [WG Technology Labs](https://wgtechlabs.com), and [Him](https://www.youtube.com/watch?v=HHrxS4diLew&t=44s) 🙏</sub>`;
     }
     
