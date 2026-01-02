@@ -18,6 +18,9 @@
  *   REGISTRY             : Target registry config
  */
 
+const fs = require('fs');
+const path = require('path');
+
 module.exports = async ({github, context, core}) => {
   try {
     // =============================================================================
@@ -32,8 +35,6 @@ module.exports = async ({github, context, core}) => {
     const resolvedSha = process.env.RESOLVED_SHA || context.sha;
     
     // Read version from package.json
-    const fs = require('fs');
-    const path = require('path');
     let actionVersion = '1.0.0'; // fallback version
     try {
       const packageJsonPath = path.join(__dirname, '..', 'package.json');
@@ -102,7 +103,6 @@ module.exports = async ({github, context, core}) => {
         return '';
       }
       
-      const fs = require('fs');
       let securitySection = '\n---\n\n## 🔒 Security Scan Results\n\n';
       
       // Pre-build scan results
