@@ -46,6 +46,7 @@ GITHUB_BASE_REF="${GITHUB_BASE_REF:-}"
 # Release context (from action.yml)
 RELEASE_TAG="${RELEASE_TAG:-}"
 RELEASE_PRERELEASE="${RELEASE_PRERELEASE:-false}"
+RELEASE_TAG_PATTERN="${RELEASE_TAG_PATTERN-^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$}"
 
 # User-configurable inputs (from action.yml)
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
@@ -234,20 +235,27 @@ detect_build_flow() {
 
         log_debug "  Release Tag: ${RELEASE_TAG}"
         log_debug "  Pre-release: ${RELEASE_PRERELEASE}"
+        log_debug "  Release Tag Pattern: ${RELEASE_TAG_PATTERN}"
 
-        # Strip leading 'v' from semver-style tags (v1.2.3 -> 1.2.3)
-        if [[ "$RELEASE_TAG" =~ ^v[0-9] ]]; then
-            release_version="${RELEASE_TAG#v}"
+        # Skip per-package monorepo release tags that don't match the expected pattern
+        if [[ -n "${RELEASE_TAG_PATTERN}" ]] && ! [[ "${RELEASE_TAG}" =~ ${RELEASE_TAG_PATTERN} ]]; then
+            log_warning "Skipping build: tag '${RELEASE_TAG}' does not match pattern '${RELEASE_TAG_PATTERN}'"
+            flow_type="skip"
         else
-            release_version="$RELEASE_TAG"
-        fi
+            # Strip leading 'v' from semver-style tags (v1.2.3 -> 1.2.3)
+            if [[ "$RELEASE_TAG" =~ ^v[0-9] ]]; then
+                release_version="${RELEASE_TAG#v}"
+            else
+                release_version="$RELEASE_TAG"
+            fi
 
-        flow_type="release"
+            flow_type="release"
 
-        if [ "$RELEASE_PRERELEASE" = "true" ]; then
-            log_success "Flow: Pre-release (${release_version})"
-        else
-            log_success "Flow: Production release (${release_version})"
+            if [ "$RELEASE_PRERELEASE" = "true" ]; then
+                log_success "Flow: Pre-release (${release_version})"
+            else
+                log_success "Flow: Production release (${release_version})"
+            fi
         fi
 
     else
@@ -259,6 +267,26 @@ detect_build_flow() {
     # =============================================================================
     # TAG GENERATION
     # =============================================================================
+
+    # Exit early for skipped builds (e.g., monorepo per-package release tags)
+    if [ "$flow_type" = "skip" ]; then
+        log_info "Exporting outputs to GitHub Actions (build skipped)..."
+        {
+            echo "build-flow-type=skip"
+            echo "tags="
+            echo "short-sha=${short_sha}"
+            echo "dockerhub-image=${DOCKERHUB_IMAGE}"
+            echo "ghcr-image=${GHCR_IMAGE}"
+            echo "extra-tags="
+        } >> "$GITHUB_OUTPUT"
+        log_success "Build flow detection complete!"
+        echo ""
+        log_info "Summary:"
+        echo -e "  ${CYAN}Flow Type:${NC} skip"
+        echo -e "  ${CYAN}Release Tag:${NC} ${RELEASE_TAG}"
+        echo -e "  ${CYAN}Reason:${NC} Tag does not match release pattern '${RELEASE_TAG_PATTERN}'"
+        return 0
+    fi
 
     log_info "Generating container tags..."
 
