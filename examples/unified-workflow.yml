@@ -1,0 +1,68 @@
+name: Unified Container Build & Release
+
+# Single workflow that handles ALL container build scenarios:
+#   - PR builds (pr-{sha}, dev-{sha}, patch-{sha}, wip-{sha})
+#   - Push builds (dev-{sha}, staging-{sha}, wip-{sha})
+#   - Release builds (1.2.3, 1.2, 1, latest — multi-arch by default)
+#
+# This eliminates the need for separate build.yml and release.yml workflows,
+# centralizing SBOM, provenance, security scanning, and registry handling
+# in one place. See: https://github.com/wgtechlabs/container-build-flow-action/issues/8
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build, Scan, and Push Container
+        id: build
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          # Registry — push to both Docker Hub and GHCR
+          registry: 'both'
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+          # Platforms — dev/PR builds use amd64 for speed,
+          # release builds auto-expand to multi-arch via release-platforms
+          platforms: 'linux/amd64'
+          release-platforms: 'linux/amd64,linux/arm64'
+
+          # SBOM & provenance — enabled by default, shown here for clarity
+          sbom: 'true'
+          provenance: 'true'
+
+          # Security scanning — fail production releases on vulnerabilities
+          image-scan-enabled: 'true'
+          fail-on-vulnerability: ${{ github.event_name == 'release' && 'true' || 'false' }}
+
+      # Display results for any flow type
+      - name: Build Summary
+        if: steps.build.outputs.build-flow-type != 'skip'
+        run: |
+          echo "Flow Type: ${{ steps.build.outputs.build-flow-type }}"
+          echo "Image Tags: ${{ steps.build.outputs.image-tags }}"
+          echo "Registry URLs:"
+          echo "${{ steps.build.outputs.registry-urls }}"
+
+          # Release-specific output
+          if [ -n "${{ steps.build.outputs.release-version }}" ]; then
+            echo "Release Version: ${{ steps.build.outputs.release-version }}"
+          fi
