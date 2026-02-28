@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.6.0] - 2026-02-28
+
+### Added
+
+- add unified workflow for container build and release
+- add release-platforms input and unified workflow example
+- add release-platforms input and resolve build platforms step
+
 ## [1.5.0] - 2026-02-28
 
 ### Added
