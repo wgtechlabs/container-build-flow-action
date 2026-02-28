@@ -1,6 +1,6 @@
 {
   "name": "container-build-flow-action",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Automated Docker/Container builds with PR/WIP/DEV/PATCH/Release flow support",
   "private": true,
   "scripts": {
