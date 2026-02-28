@@ -33,7 +33,7 @@ module.exports = async ({github, context, core}) => {
     const registry = process.env.REGISTRY || 'both';
     const resolvedSha = process.env.RESOLVED_SHA || context.sha;
     
-    const actionVersion = '1.2.0';
+    const actionVersion = process.env.ACTION_REF || 'dev';
     
     // Security scanning environment variables
     const vulnerabilityCommentEnabled = process.env.VULNERABILITY_COMMENT_ENABLED || 'true';

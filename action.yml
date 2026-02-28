@@ -423,14 +423,14 @@ runs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: ${{ inputs.build-args }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: ${{ inputs.cache-enabled == 'true' && 'type=gha' || '' }}
+        cache-to: ${{ inputs.cache-enabled == 'true' && 'type=gha,mode=max' || '' }}
         provenance: ${{ inputs.provenance }}
         sbom: ${{ inputs.sbom }}
     
     - name: Generate Action Outputs
       id: output
-      if: steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
       shell: bash
       run: |
         bash ${{ github.action_path }}/scripts/generate-outputs.sh
@@ -538,7 +538,7 @@ runs:
     # =============================================================================
     
     - name: Comment on Pull Request
-      if: inputs.pr-comment-enabled == 'true' && github.event_name != 'release'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pr-comment-enabled == 'true' && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target')
       uses: actions/github-script@v7
       with:
         github-token: ${{ inputs.ghcr-token || github.token }}
@@ -558,3 +558,4 @@ runs:
         PRE_BUILD_SCAN_ENABLED: ${{ inputs.pre-build-scan-enabled }}
         IMAGE_SCAN_ENABLED: ${{ inputs.image-scan-enabled }}
         ENABLE_IMAGE_COMPARISON: ${{ inputs.enable-image-comparison }}
+        ACTION_REF: ${{ github.action_ref || 'dev' }}
