@@ -21,6 +21,7 @@ node_modules/
 # Test files
 test/
 *.test.js
+*.test.ts
 
 # Temporary files
 tmp/

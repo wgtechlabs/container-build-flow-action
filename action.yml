@@ -520,14 +520,14 @@ runs:
       id: scan-summary
       shell: bash
       run: |
-        node ${{ github.action_path }}/scripts/parse-trivy-results.js
+        node ${{ github.action_path }}/dist/parse-trivy-results.js
     
     - name: Generate Vulnerability Comparison
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       shell: bash
       continue-on-error: true
       run: |
-        node ${{ github.action_path }}/scripts/generate-comparison.js
+        node ${{ github.action_path }}/dist/generate-comparison.js
     
     - name: Check Vulnerability Threshold
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.fail-on-vulnerability == 'true' && steps.detect.outputs.build-flow-type != 'skip'
@@ -587,7 +587,7 @@ runs:
         github-token: ${{ inputs.ghcr-token || github.token }}
         script: |
           const fs = require('fs');
-          const scriptPath = '${{ github.action_path }}/scripts/pr-comment.js';
+          const scriptPath = '${{ github.action_path }}/dist/pr-comment.js';
           const script = require(scriptPath);
           await script({github, context, core});
       env:
