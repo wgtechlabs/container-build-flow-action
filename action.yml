@@ -24,16 +24,6 @@ inputs:
     required: false
     default: ''
   
-  dockerhub-username-secret:
-    description: 'Name of secret containing Docker Hub username'
-    required: false
-    default: 'DOCKERHUB_USERNAME'
-  
-  dockerhub-token-secret:
-    description: 'Name of secret containing Docker Hub token'
-    required: false
-    default: 'DOCKERHUB_TOKEN'
-  
   # GitHub Container Registry Credentials
   ghcr-token:
     description: 'GitHub token for GHCR (defaults to GITHUB_TOKEN)'
