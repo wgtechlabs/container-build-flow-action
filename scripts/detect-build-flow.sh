@@ -98,13 +98,6 @@ get_repo_name() {
     echo "${GITHUB_REPOSITORY##*/}"
 }
 
-# Sanitize branch name for tag usage
-sanitize_branch_name() {
-    local branch="$1"
-    # Replace slashes and special characters with hyphens
-    echo "$branch" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g' | tr '[:upper:]' '[:lower:]'
-}
-
 # Extract prerelease identifier from semver (e.g., "beta" from "1.2.3-beta.1")
 extract_prerelease_id() {
     local version="$1"
@@ -169,6 +162,7 @@ detect_build_flow() {
     log_debug "  Dev Branch: ${DEV_BRANCH}"
     
     local flow_type=""
+    local release_version=""
     local short_sha
     short_sha=$(get_short_sha)
     
