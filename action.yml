@@ -439,7 +439,7 @@ runs:
     
     - name: Upload Source Scan SARIF
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       continue-on-error: true
       with:
         sarif_file: 'trivy-source-results.sarif'
@@ -471,7 +471,7 @@ runs:
     
     - name: Upload Dockerfile Scan SARIF
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       continue-on-error: true
       with:
         sarif_file: 'trivy-dockerfile-results.sarif'
@@ -630,7 +630,7 @@ runs:
     
     - name: Upload Image Scan SARIF
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       continue-on-error: true
       with:
         sarif_file: 'trivy-image-results.sarif'
