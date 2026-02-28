@@ -1,0 +1,51 @@
+name: Smart Build with Commit Convention Gate
+
+# Demonstrates the commit convention gate feature
+# Only build-relevant commit types (new, fix, update, etc.) trigger container builds
+# Documentation, test, and style changes are automatically skipped
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build and Push Container (Smart Gated)
+        id: build
+        uses: wgtechlabs/container-build-flow-action@v1
+        with:
+          # Registry credentials
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+          # Enable smart build filtering
+          commit-convention-enabled: 'true'
+          commit-convention: 'clean-commit'
+          
+          # Customize which commit types trigger builds (these are the defaults)
+          # build-trigger-types: 'new,feat,add,fix,bugfix,update,refactor,perf,security,remove,delete,setup,chore'
+          # build-skip-types: 'docs,test,release,style,ci,build'
+      
+      # You can check why a build was skipped
+      - name: Check Build Status
+        if: always()
+        run: |
+          echo "Build flow type: ${{ steps.build.outputs.build-flow-type }}"
+          echo "Commit type: ${{ steps.build.outputs.commit-type }}"
+          echo "Skip reason: ${{ steps.build.outputs.build-skip-reason }}"

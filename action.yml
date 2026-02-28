@@ -211,6 +211,27 @@ inputs:
     required: false
     default: 'false'
 
+  # Commit Convention Gate (Smart Build Filtering)
+  commit-convention-enabled:
+    description: 'Enable smart build filtering based on commit message conventions. When enabled, only commits with build-relevant types (e.g., new, fix, update) trigger builds. Commits like docs or test changes are skipped.'
+    required: false
+    default: 'false'
+  
+  commit-convention:
+    description: 'Commit message convention to parse. Affects default trigger/skip type lists when not explicitly overridden. clean-commit uses types like new, update, setup; conventional uses feat, fix, perf, etc.'
+    required: false
+    default: 'clean-commit'
+  
+  build-trigger-types:
+    description: 'Comma-separated commit types that trigger a container build. If a type appears in both trigger and skip lists, skip takes priority. Leave empty to use convention-aware defaults.'
+    required: false
+    default: ''
+  
+  build-skip-types:
+    description: 'Comma-separated commit types that skip the container build. Skip list is checked before trigger list, so skip takes priority if a type appears in both. Leave empty to use convention-aware defaults.'
+    required: false
+    default: ''
+
   # Monorepo Configuration
   release-tag-pattern:
     description: 'Regex pattern to match release tags that trigger container builds. Non-matching tags (e.g., monorepo per-package tags like @scope/pkg@1.0.0) are skipped. Use empty string to allow all release tags.'
@@ -231,8 +252,8 @@ outputs:
     value: ${{ steps.output.outputs.build-digest }}
   
   build-flow-type:
-    description: 'Detected build flow type (pr, dev, patch, staging, wip, release, skip)'
-    value: ${{ steps.detect.outputs.build-flow-type }}
+    description: 'Detected build flow type (pr, dev, patch, staging, wip, release, skip). Returns skip when the commit convention gate blocks the build or when a release tag does not match the expected pattern.'
+    value: ${{ steps.detect.outputs.build-flow-type || steps.commit-gate.outputs.build-flow-type }}
   
   short-sha:
     description: 'Short commit SHA used in tags'
@@ -267,6 +288,15 @@ outputs:
     description: 'Number of LOW severity vulnerabilities'
     value: ${{ steps.scan-summary.outputs.low }}
 
+  # Commit Convention Gate Outputs
+  commit-type:
+    description: 'Detected commit type from the commit message (e.g., new, fix, docs). Only populated when commit-convention-enabled is true.'
+    value: ${{ steps.commit-gate.outputs.commit-type }}
+  
+  build-skip-reason:
+    description: 'Reason the build was skipped by the commit convention gate. Empty if the build proceeded.'
+    value: ${{ steps.commit-gate.outputs.build-skip-reason }}
+
 runs:
   using: 'composite'
   steps:
@@ -280,8 +310,21 @@ runs:
           echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
         fi
     
+    - name: Commit Convention Gate
+      id: commit-gate
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/scripts/detect-commit-convention.sh
+      env:
+        COMMIT_CONVENTION_ENABLED: ${{ inputs.commit-convention-enabled }}
+        COMMIT_CONVENTION: ${{ inputs.commit-convention }}
+        BUILD_TRIGGER_TYPES: ${{ inputs.build-trigger-types }}
+        BUILD_SKIP_TYPES: ${{ inputs.build-skip-types }}
+        PR_TITLE: ${{ github.event.pull_request.title }}
+
     - name: Detect Build Flow and Generate Tags
       id: detect
+      if: steps.commit-gate.outputs.should-build != 'false'
       shell: bash
       run: |
         bash ${{ github.action_path }}/scripts/detect-build-flow.sh
@@ -297,7 +340,7 @@ runs:
         RELEASE_TAG_PATTERN: ${{ inputs.release-tag-pattern }}
 
     - name: Set up Docker Buildx
-      if: steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/setup-buildx-action@v3
     
     # =============================================================================
@@ -305,7 +348,7 @@ runs:
     # =============================================================================
     
     - name: Run Trivy Filesystem Scan (Source Code)
-      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -320,7 +363,7 @@ runs:
         skip-files: ${{ inputs.trivy-skip-files }}
     
     - name: Upload Source Code Scan to GitHub Security
-      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -335,7 +378,7 @@ runs:
         skip-files: ${{ inputs.trivy-skip-files }}
     
     - name: Upload Source Scan SARIF
-      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: github/codeql-action/upload-sarif@v3
       continue-on-error: true
       with:
@@ -343,7 +386,7 @@ runs:
         category: ${{ inputs.sarif-category-source }}
     
     - name: Run Trivy Config Scan (Dockerfile)
-      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -355,7 +398,7 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Upload Dockerfile Scan to GitHub Security
-      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -367,7 +410,7 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Upload Dockerfile Scan SARIF
-      if: inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: github/codeql-action/upload-sarif@v3
       continue-on-error: true
       with:
@@ -379,14 +422,14 @@ runs:
     # =============================================================================
     
     - name: Login to Docker Hub
-      if: (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/login-action@v3
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
     
     - name: Login to GitHub Container Registry
-      if: (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
@@ -395,7 +438,7 @@ runs:
     
     - name: Extract Docker Metadata
       id: meta
-      if: steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/metadata-action@v5
       with:
         images: |
@@ -412,7 +455,7 @@ runs:
     
     - name: Build and Push Container Image
       id: build
-      if: steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/build-push-action@v5
       with:
         context: ${{ inputs.context }}
@@ -447,7 +490,7 @@ runs:
     # =============================================================================
     
     - name: Scan Baseline Image (for comparison)
-      if: inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != '' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != '' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -460,7 +503,7 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Scan Container Image
-      if: inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -473,21 +516,21 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Parse Trivy Results and Generate Summary
-      if: inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       id: scan-summary
       shell: bash
       run: |
         node ${{ github.action_path }}/scripts/parse-trivy-results.js
     
     - name: Generate Vulnerability Comparison
-      if: inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       shell: bash
       continue-on-error: true
       run: |
         node ${{ github.action_path }}/scripts/generate-comparison.js
     
     - name: Check Vulnerability Threshold
-      if: inputs.image-scan-enabled == 'true' && inputs.fail-on-vulnerability == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.fail-on-vulnerability == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       shell: bash
       run: |
         if [ -f trivy-scan-summary.json ]; then
@@ -513,7 +556,7 @@ runs:
         fi
     
     - name: Upload Container Image Scan to GitHub Security
-      if: inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: aquasecurity/trivy-action@0.33.1
       continue-on-error: true
       with:
@@ -526,7 +569,7 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Upload Image Scan SARIF
-      if: inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
       uses: github/codeql-action/upload-sarif@v3
       continue-on-error: true
       with:
