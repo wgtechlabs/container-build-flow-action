@@ -62,6 +62,11 @@ inputs:
     required: false
     default: 'linux/amd64'
   
+  release-platforms:
+    description: 'Target platforms for release builds (overrides platforms for release flows). Set to empty string to use the same platforms as non-release builds.'
+    required: false
+    default: 'linux/amd64,linux/arm64'
+  
   build-args:
     description: 'Build arguments (newline-separated, e.g., ARG1=value1)'
     required: false
@@ -339,6 +344,19 @@ runs:
         RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         RELEASE_TAG_PATTERN: ${{ inputs.release-tag-pattern }}
 
+    - name: Resolve Build Platforms
+      id: platforms
+      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
+      shell: bash
+      run: |
+        if [ "${{ steps.detect.outputs.build-flow-type }}" = "release" ] && [ -n "${{ inputs.release-platforms }}" ]; then
+          echo "platforms=${{ inputs.release-platforms }}" >> $GITHUB_OUTPUT
+          echo "ℹ️  Using release platforms: ${{ inputs.release-platforms }}"
+        else
+          echo "platforms=${{ inputs.platforms }}" >> $GITHUB_OUTPUT
+          echo "ℹ️  Using default platforms: ${{ inputs.platforms }}"
+        fi
+
     - name: Set up Docker Buildx
       if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/setup-buildx-action@v3
@@ -460,7 +478,7 @@ runs:
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
-        platforms: ${{ inputs.platforms }}
+        platforms: ${{ steps.platforms.outputs.platforms }}
         push: ${{ inputs.push-enabled }}
         load: ${{ inputs.load-enabled }}
         tags: ${{ steps.meta.outputs.tags }}
