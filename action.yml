@@ -516,7 +516,7 @@ runs:
     - name: Build and Push Container Image
       id: build
       if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
