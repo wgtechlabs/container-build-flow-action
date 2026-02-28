@@ -1,0 +1,18 @@
+{
+  "name": "container-build-flow-action",
+  "version": "1.0.0",
+  "description": "Automated Docker/Container builds with PR/WIP/DEV/PATCH/Release flow support",
+  "private": true,
+  "scripts": {
+    "build": "bun build src/parse-trivy-results.ts --outdir dist --target node --format cjs && bun build src/generate-comparison.ts --outdir dist --target node --format cjs && bun build src/pr-comment.ts --outdir dist --target node --format cjs",
+    "clean": "rm -rf dist",
+    "rebuild": "bun run clean && bun run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "author": "WG Technology Labs",
+  "license": "MIT"
+}
