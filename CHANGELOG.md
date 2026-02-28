@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
 
+- add `release-platforms` input for multi-arch release builds
+- add unified workflow example for PR, dev, and release builds
+
+### Changed
+
+- release builds now default to `linux/amd64,linux/arm64` platforms
 
 
 
