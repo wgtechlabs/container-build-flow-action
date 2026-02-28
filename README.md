@@ -570,6 +570,7 @@ permissions:
 ### 📚 Example Workflows
 
 See the [`examples/`](examples/) directory for complete workflow examples:
+- [`unified-workflow.yml`](examples/unified-workflow.yml) - Single workflow for PR, dev, and release builds
 - [`basic-scanning.yml`](examples/basic-scanning.yml) - Default security scanning
 - [`strict-security.yml`](examples/strict-security.yml) - Fail on vulnerabilities
 - [`with-comparison.yml`](examples/with-comparison.yml) - Baseline comparison
@@ -602,6 +603,7 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `dockerfile` | Path to Dockerfile | No | `./Dockerfile` |
 | `context` | Build context path | No | `.` |
 | `platforms` | Target platforms (comma-separated) | No | `linux/amd64` |
+| `release-platforms` | Target platforms for release builds (overrides `platforms`) | No | `linux/amd64,linux/arm64` |
 | `build-args` | Build arguments (newline-separated) | No | `''` |
 | `labels` | Image labels (newline-separated) | No | `''` |
 | `cache-enabled` | Enable build cache | No | `true` |
