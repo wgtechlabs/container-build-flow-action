@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.5.0] - 2026-02-28
+
+### Added
+
+- migrate scripts to typescript
+
+### Changed
+
+- update action to use compiled dist output
+- configure typescript build tooling
+
 ## [1.4.0] - 2026-02-28
 
 ### Added
