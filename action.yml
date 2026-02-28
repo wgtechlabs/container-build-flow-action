@@ -243,6 +243,12 @@ inputs:
     required: false
     default: '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'
 
+  # Bot Detection
+  bot-detection:
+    description: 'Auto-detect bot actors (e.g., dependabot[bot], renovate[bot]) and skip the build. Prevents CI failures from missing secrets on bot-generated PRs.'
+    required: false
+    default: 'true'
+
 outputs:
   image-tags:
     description: 'Complete list of applied image tags'
@@ -257,7 +263,7 @@ outputs:
     value: ${{ steps.output.outputs.build-digest }}
   
   build-flow-type:
-    description: 'Detected build flow type (pr, dev, patch, staging, wip, release, skip). Returns skip when the commit convention gate blocks the build or when a release tag does not match the expected pattern.'
+    description: 'Detected build flow type (pr, dev, patch, staging, wip, release, skip). Returns skip when a bot actor is detected, the commit convention gate blocks the build, or a release tag does not match the expected pattern.'
     value: ${{ steps.detect.outputs.build-flow-type || steps.commit-gate.outputs.build-flow-type }}
   
   short-sha:
@@ -298,13 +304,39 @@ outputs:
     description: 'Detected commit type from the commit message (e.g., new, fix, docs). Only populated when commit-convention-enabled is true.'
     value: ${{ steps.commit-gate.outputs.commit-type }}
   
+  bot-detected:
+    description: 'Whether a bot actor was detected (true/false). Only populated when bot-detection is enabled.'
+    value: ${{ steps.bot-gate.outputs.is-bot }}
+
   build-skip-reason:
-    description: 'Reason the build was skipped by the commit convention gate. Empty if the build proceeded.'
+    description: 'Reason the build was skipped (bot detection or commit convention gate). Empty if the build proceeded.'
     value: ${{ steps.commit-gate.outputs.build-skip-reason }}
 
 runs:
   using: 'composite'
   steps:
+    - name: Detect Bot Actor
+      id: bot-gate
+      shell: bash
+      run: |
+        ACTOR="${{ github.actor }}"
+        BOT_DETECTION="${{ inputs.bot-detection }}"
+
+        if [ "$BOT_DETECTION" != "true" ]; then
+          echo "is-bot=false" >> "$GITHUB_OUTPUT"
+          echo "ℹ️  Bot detection is disabled"
+          exit 0
+        fi
+
+        if [[ "$ACTOR" == *"[bot]"* ]]; then
+          echo "is-bot=true" >> "$GITHUB_OUTPUT"
+          echo "build-skip-reason=Bot actor: ${ACTOR}" >> "$GITHUB_OUTPUT"
+          echo "⚠️  Bot actor detected (${ACTOR}) — build will be skipped"
+        else
+          echo "is-bot=false" >> "$GITHUB_OUTPUT"
+          echo "ℹ️  Actor '${ACTOR}' is not a bot"
+        fi
+
     - name: Resolve Commit SHA
       id: sha
       shell: bash
@@ -319,8 +351,18 @@ runs:
       id: commit-gate
       shell: bash
       run: |
+        # Skip build if bot actor was detected
+        if [ "$BOT_DETECTED" = "true" ]; then
+          echo "should-build=false" >> "$GITHUB_OUTPUT"
+          echo "build-flow-type=skip" >> "$GITHUB_OUTPUT"
+          echo "build-skip-reason=${BOT_SKIP_REASON}" >> "$GITHUB_OUTPUT"
+          echo "⚠️  Skipping build — ${BOT_SKIP_REASON}"
+          exit 0
+        fi
         bash ${{ github.action_path }}/scripts/detect-commit-convention.sh
       env:
+        BOT_DETECTED: ${{ steps.bot-gate.outputs.is-bot }}
+        BOT_SKIP_REASON: ${{ steps.bot-gate.outputs.build-skip-reason }}
         COMMIT_CONVENTION_ENABLED: ${{ inputs.commit-convention-enabled }}
         COMMIT_CONVENTION: ${{ inputs.commit-convention }}
         BUILD_TRIGGER_TYPES: ${{ inputs.build-trigger-types }}

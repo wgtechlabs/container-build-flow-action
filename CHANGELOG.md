@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - add `release-platforms` input for multi-arch release builds
 - add unified workflow example for PR, dev, and release builds
+- add `bot-detection` input to auto-detect bot actors and skip builds gracefully
+- add `bot-detected` output for downstream visibility
 
 ### Changed
 

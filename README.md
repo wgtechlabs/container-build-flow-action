@@ -654,6 +654,14 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `comparison-baseline-image` | Baseline image for comparison | No | `''` |
 | `fail-on-vulnerability` | Fail build if vulnerabilities found | No | `false` |
 
+### Bot Detection
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `bot-detection` | Auto-detect bot actors and skip the build | No | `true` |
+
+> **Tip:** When enabled, bot actors like `dependabot[bot]` and `renovate[bot]` are automatically detected. The build is gracefully skipped with a clear reason, preventing CI failures from missing secrets on bot-generated PRs. The job still shows a green check, making it safe to use as a required status check.
+
 ---
 
 ## 📤 Outputs
@@ -663,8 +671,10 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `image-tags` | Complete list of applied image tags |
 | `registry-urls` | Full image URLs for each registry |
 | `build-digest` | SHA256 digest of built image |
-| `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`) |
+| `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`, `release`, `skip`) |
 | `short-sha` | Short commit SHA used in tags |
+| `bot-detected` | Whether a bot actor was detected (`true`/`false`) |
+| `build-skip-reason` | Reason the build was skipped (bot or commit convention) |
 | `vulnerability-scan-completed` | Whether vulnerability scanning completed successfully |
 | `total-vulnerabilities` | Total number of vulnerabilities found |
 | `critical-vulnerabilities` | Number of CRITICAL severity vulnerabilities |
