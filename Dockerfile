@@ -1,7 +1,7 @@
 # Test Dockerfile for Container Build Flow Action
 # This is a minimal image used to validate the action's functionality
 
-FROM alpine:3.19
+FROM alpine:3.21
 
 # Add metadata
 LABEL maintainer="WG Technology Labs <hello@wgtechlabs.com>"
