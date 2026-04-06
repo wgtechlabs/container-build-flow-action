@@ -7,20 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- add `release-platforms` input for multi-arch release builds
-- add unified workflow example for PR, dev, and release builds
-- add `bot-detection` input to auto-detect bot actors and skip builds gracefully
-- add `bot-detected` output for downstream visibility
-
 ### Changed
 
-- release builds now default to `linux/amd64,linux/arm64` platforms
-
-
-
-
+- Bump typescript from 5.9.3 to 6.0.2 (#34)
+- Bump docker/login-action from 3 to 4 (#33)
+- Bump docker/build-push-action from 6 to 7 (#32)
+- Bump docker/metadata-action from 5 to 6 (#31)
+- Bump docker/setup-buildx-action from 3 to 4 (#30)
+- Bump aquasecurity/trivy-action from 0.34.1 to 0.35.0 (#29)
+- Bump aquasecurity/trivy-action from 0.33.1 to 0.34.1 (#22)
+- Bump actions/github-script from 7 to 8 (#24)
+- Bump alpine from 3.21 to 3.23 (#23)
+- Bump docker/build-push-action from 5 to 6 (#25)
+- Bump actions/checkout from 4 to 6 (#26)
+- Bump @types/node from 22.19.13 to 25.3.2 (#28)
+- Bump github/codeql-action from 3 to 4
+- add dependabot configuration for automated updates
 
 ## [1.7.0] - 2026-02-28
 
