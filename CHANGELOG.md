@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [1.7.1] - 2026-04-06
+
 ### Changed
 
+- update CHANGELOG.md for v1.7.0
 - Bump typescript from 5.9.3 to 6.0.2 (#34)
 - Bump docker/login-action from 3 to 4 (#33)
 - Bump docker/build-push-action from 6 to 7 (#32)
@@ -23,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump @types/node from 22.19.13 to 25.3.2 (#28)
 - Bump github/codeql-action from 3 to 4
 - add dependabot configuration for automated updates
+
+### Security
+
+- fix trivy-action tag to use v-prefix for resolution
 
 ## [1.7.0] - 2026-02-28
 
