@@ -499,7 +499,7 @@ runs:
     - name: Extract Docker Metadata
       id: meta
       if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@v6
       with:
         images: |
           ${{ (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.dockerhub-image || '' }}
