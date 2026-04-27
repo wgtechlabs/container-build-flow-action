@@ -409,7 +409,7 @@ runs:
     
     - name: Run Trivy Filesystem Scan (Source Code)
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'fs'
@@ -424,7 +424,7 @@ runs:
     
     - name: Upload Source Code Scan to GitHub Security
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'fs'
@@ -447,7 +447,7 @@ runs:
     
     - name: Run Trivy Config Scan (Dockerfile)
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'config'
@@ -459,7 +459,7 @@ runs:
     
     - name: Upload Dockerfile Scan to GitHub Security
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'config'
@@ -551,7 +551,7 @@ runs:
     
     - name: Scan Baseline Image (for comparison)
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != '' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -564,7 +564,7 @@ runs:
     
     - name: Scan Container Image
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -617,7 +617,7 @@ runs:
     
     - name: Upload Container Image Scan to GitHub Security
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
