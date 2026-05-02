@@ -128,6 +128,8 @@ All flow types use **commit SHA** (first 7 characters) for tagging, ensuring tra
 
 > **Note:** The `{sha}` in each tag represents the **HEAD commit SHA** of the PR or push event, not the PR number. This ensures every build can be traced to its exact source code.
 
+> **Tip:** Enable `floating-tags: true` to also push a mutable `dev`, `pr`, `patch`, `staging`, or `wip` tag that always points to the latest build for that flow type — great for `docker-compose.yml` or Kubernetes manifests that should follow the tip of a branch without requiring manual SHA updates.
+
 ---
 
 ## 🏷️ Tagging Strategy
@@ -155,6 +157,29 @@ myorg/myapp:staging-ghi9012
 
 # With custom prefix/suffix
 myorg/myapp:v1-pr-abc1234-alpine
+
+# With floating-tags: true — also pushes a mutable floating tag
+myorg/myapp:dev          # always points to the latest dev build
+myorg/myapp:dev-def5678  # still pushed for reproducibility
+```
+
+### Floating Tags
+
+Enable `floating-tags: true` to push an additional mutable tag (e.g., `dev`, `pr`, `patch`, `staging`, `wip`) alongside the SHA-pinned tag on every non-release build. The floating tag always points to the most recent build for that flow type, while the SHA-pinned tag remains for reproducibility.
+
+```yaml
+- uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    floating-tags: true   # push both dev-abc1234 AND dev
+```
+
+This is especially useful in `docker-compose.yml` or Kubernetes manifests where you want to follow the tip of a branch:
+
+```yaml
+# docker-compose.yml — always use the latest dev build
+services:
+  app:
+    image: myorg/myapp:dev
 ```
 
 ### Workflow Integration
@@ -615,6 +640,7 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `image-name` | Container image name | No | Repository name |
 | `tag-prefix` | Prefix for image tags | No | `''` |
 | `tag-suffix` | Suffix for image tags | No | `''` |
+| `floating-tags` | Push a mutable floating tag (e.g., `dev`, `pr`) alongside the SHA-pinned tag for non-release flows | No | `false` |
 
 ### PR Comments
 

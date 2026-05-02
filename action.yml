@@ -249,6 +249,12 @@ inputs:
     required: false
     default: 'true'
 
+  # Floating Tags
+  floating-tags:
+    description: 'Push a mutable floating tag (e.g., dev, pr, patch, staging, wip) for each non-release build in addition to the SHA-pinned tag. Useful for always pulling the latest build of a given flow type without updating the SHA manually.'
+    required: false
+    default: 'false'
+
 outputs:
   image-tags:
     description: 'Complete list of applied image tags'
@@ -385,6 +391,7 @@ runs:
         RELEASE_TAG: ${{ github.event.release.tag_name }}
         RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         RELEASE_TAG_PATTERN: ${{ inputs.release-tag-pattern }}
+        FLOATING_TAGS: ${{ inputs.floating-tags }}
 
     - name: Resolve Build Platforms
       id: platforms

@@ -54,6 +54,7 @@ DEV_BRANCH="${DEV_BRANCH:-dev}"
 TAG_PREFIX="${TAG_PREFIX:-}"
 TAG_SUFFIX="${TAG_SUFFIX:-}"
 IMAGE_NAME="${IMAGE_NAME:-}"
+FLOATING_TAGS="${FLOATING_TAGS:-false}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -327,6 +328,12 @@ type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
         full_tag="${TAG_PREFIX}${base_tag}${TAG_SUFFIX}"
         log_debug "  Base tag: ${base_tag}"
         log_debug "  Full tag: ${full_tag}"
+
+        # Floating tag: mutable tag pointing to the latest build of this flow type
+        if [ "$FLOATING_TAGS" = "true" ]; then
+            extra_tags="type=raw,value=${TAG_PREFIX}${flow_type}${TAG_SUFFIX}"
+            log_debug "  Floating tag: ${TAG_PREFIX}${flow_type}${TAG_SUFFIX}"
+        fi
     fi
 
     # =============================================================================
