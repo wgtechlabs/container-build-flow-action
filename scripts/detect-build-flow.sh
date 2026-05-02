@@ -22,7 +22,8 @@
 # Outputs (via GitHub Actions):
 #   - build-flow-type  : The detected flow type
 #   - tags             : Generated container tag (primary)
-#   - extra-tags       : Additional tags for release flows (multi-line type=raw)
+#   - extra-tags       : Additional tags (multi-line type=raw): semver/channel/latest tags
+#                        for release flows, and optional floating tags for non-release flows
 #   - short-sha        : Short commit SHA
 #   - release-version  : Clean version string (release only)
 #   - dockerhub-image  : Docker Hub image name
