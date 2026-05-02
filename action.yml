@@ -249,6 +249,12 @@ inputs:
     required: false
     default: 'true'
 
+  # Floating Tags
+  floating-tags:
+    description: 'Push a mutable floating tag (e.g., dev, pr, patch, staging, wip) for each non-release build in addition to the SHA-pinned tag. Useful for always pulling the latest build of a given flow type without updating the SHA manually.'
+    required: false
+    default: 'false'
+
 outputs:
   image-tags:
     description: 'Complete list of applied image tags'
@@ -385,6 +391,7 @@ runs:
         RELEASE_TAG: ${{ github.event.release.tag_name }}
         RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         RELEASE_TAG_PATTERN: ${{ inputs.release-tag-pattern }}
+        FLOATING_TAGS: ${{ inputs.floating-tags }}
 
     - name: Resolve Build Platforms
       id: platforms
@@ -409,7 +416,7 @@ runs:
     
     - name: Run Trivy Filesystem Scan (Source Code)
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'fs'
@@ -424,7 +431,7 @@ runs:
     
     - name: Upload Source Code Scan to GitHub Security
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-source-code == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'fs'
@@ -447,7 +454,7 @@ runs:
     
     - name: Run Trivy Config Scan (Dockerfile)
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'config'
@@ -459,7 +466,7 @@ runs:
     
     - name: Upload Dockerfile Scan to GitHub Security
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pre-build-scan-enabled == 'true' && inputs.scan-dockerfile == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'config'
@@ -551,7 +558,7 @@ runs:
     
     - name: Scan Baseline Image (for comparison)
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != '' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -564,7 +571,7 @@ runs:
     
     - name: Scan Container Image
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -617,7 +624,7 @@ runs:
     
     - name: Upload Container Image Scan to GitHub Security
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
-      uses: aquasecurity/trivy-action@v0.35.0
+      uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
@@ -642,7 +649,7 @@ runs:
     
     - name: Comment on Pull Request
       if: steps.commit-gate.outputs.should-build != 'false' && inputs.pr-comment-enabled == 'true' && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target')
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         github-token: ${{ inputs.ghcr-token || github.token }}
         script: |

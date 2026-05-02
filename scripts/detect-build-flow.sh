@@ -22,7 +22,8 @@
 # Outputs (via GitHub Actions):
 #   - build-flow-type  : The detected flow type
 #   - tags             : Generated container tag (primary)
-#   - extra-tags       : Additional tags for release flows (multi-line type=raw)
+#   - extra-tags       : Additional tags (multi-line type=raw): semver/channel/latest tags
+#                        for release flows, and optional floating tags for non-release flows
 #   - short-sha        : Short commit SHA
 #   - release-version  : Clean version string (release only)
 #   - dockerhub-image  : Docker Hub image name
@@ -54,6 +55,7 @@ DEV_BRANCH="${DEV_BRANCH:-dev}"
 TAG_PREFIX="${TAG_PREFIX:-}"
 TAG_SUFFIX="${TAG_SUFFIX:-}"
 IMAGE_NAME="${IMAGE_NAME:-}"
+FLOATING_TAGS="${FLOATING_TAGS:-false}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -327,6 +329,12 @@ type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
         full_tag="${TAG_PREFIX}${base_tag}${TAG_SUFFIX}"
         log_debug "  Base tag: ${base_tag}"
         log_debug "  Full tag: ${full_tag}"
+
+        # Floating tag: mutable tag pointing to the latest build of this flow type
+        if [ "$FLOATING_TAGS" = "true" ]; then
+            extra_tags="type=raw,value=${TAG_PREFIX}${flow_type}${TAG_SUFFIX}"
+            log_debug "  Floating tag: ${TAG_PREFIX}${flow_type}${TAG_SUFFIX}"
+        fi
     fi
 
     # =============================================================================
