@@ -249,6 +249,11 @@ inputs:
     required: false
     default: 'true'
 
+  bot-detection-mode:
+    description: 'Controls which identity is evaluated for bot detection: smart (default, uses PR author for PR events), actor (always uses github.actor), or pr-author (always uses PR author when available). See README for details.'
+    required: false
+    default: 'smart'
+
   # Floating Tags
   floating-tags:
     description: 'Push a mutable floating tag (e.g., dev, pr, patch, staging, wip) for each non-release build in addition to the SHA-pinned tag. Useful for always pulling the latest build of a given flow type without updating the SHA manually.'
@@ -314,6 +319,14 @@ outputs:
     description: 'Whether a bot actor was detected (true/false). Only populated when bot-detection is enabled.'
     value: ${{ steps.bot-gate.outputs.is-bot }}
 
+  bot-evaluation-subject:
+    description: 'The identity evaluated for bot detection (actor or pr-author).'
+    value: ${{ steps.bot-gate.outputs.bot-evaluation-subject }}
+
+  bot-evaluation-value:
+    description: 'The actual login value that was evaluated for bot detection (e.g., dependabot[bot] or warengonzaga).'
+    value: ${{ steps.bot-gate.outputs.bot-evaluation-value }}
+
   build-skip-reason:
     description: 'Reason the build was skipped (bot detection or commit convention gate). Empty if the build proceeded.'
     value: ${{ steps.commit-gate.outputs.build-skip-reason }}
@@ -326,21 +339,52 @@ runs:
       shell: bash
       run: |
         ACTOR="${{ github.actor }}"
+        PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+        EVENT_NAME="${{ github.event_name }}"
         BOT_DETECTION="${{ inputs.bot-detection }}"
+        BOT_DETECTION_MODE="${{ inputs.bot-detection-mode }}"
 
         if [ "$BOT_DETECTION" != "true" ]; then
           echo "is-bot=false" >> "$GITHUB_OUTPUT"
+          echo "bot-evaluation-subject=actor" >> "$GITHUB_OUTPUT"
+          echo "bot-evaluation-value=${ACTOR}" >> "$GITHUB_OUTPUT"
           echo "ℹ️  Bot detection is disabled"
           exit 0
         fi
 
-        if [[ "$ACTOR" == *"[bot]"* ]]; then
+        # Determine which subject to evaluate based on mode and event type
+        SUBJECT="actor"
+        SUBJECT_VALUE="$ACTOR"
+
+        if [ "$BOT_DETECTION_MODE" = "smart" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "pull_request_target" ]; then
+            if [ -n "$PR_AUTHOR" ]; then
+              SUBJECT="pr-author"
+              SUBJECT_VALUE="$PR_AUTHOR"
+              echo "ℹ️  Smart mode: PR event detected — evaluating PR author '${SUBJECT_VALUE}' instead of actor '${ACTOR}'"
+            fi
+          fi
+        elif [ "$BOT_DETECTION_MODE" = "pr-author" ]; then
+          if [ -n "$PR_AUTHOR" ]; then
+            SUBJECT="pr-author"
+            SUBJECT_VALUE="$PR_AUTHOR"
+            echo "ℹ️  pr-author mode: evaluating PR author '${SUBJECT_VALUE}' instead of actor '${ACTOR}'"
+          else
+            echo "ℹ️  pr-author mode: no PR author available, falling back to actor '${ACTOR}'"
+          fi
+        fi
+        # actor mode: keep defaults (SUBJECT=actor, SUBJECT_VALUE=ACTOR)
+
+        echo "bot-evaluation-subject=${SUBJECT}" >> "$GITHUB_OUTPUT"
+        echo "bot-evaluation-value=${SUBJECT_VALUE}" >> "$GITHUB_OUTPUT"
+
+        if [[ "$SUBJECT_VALUE" == *"[bot]"* ]]; then
           echo "is-bot=true" >> "$GITHUB_OUTPUT"
-          echo "build-skip-reason=Bot actor: ${ACTOR}" >> "$GITHUB_OUTPUT"
-          echo "⚠️  Bot actor detected (${ACTOR}) — build will be skipped"
+          echo "build-skip-reason=Bot ${SUBJECT}: ${SUBJECT_VALUE}" >> "$GITHUB_OUTPUT"
+          echo "⚠️  Bot ${SUBJECT} detected (${SUBJECT_VALUE}) — build will be skipped"
         else
           echo "is-bot=false" >> "$GITHUB_OUTPUT"
-          echo "ℹ️  Actor '${ACTOR}' is not a bot"
+          echo "ℹ️  Evaluated ${SUBJECT} '${SUBJECT_VALUE}' — not a bot"
         fi
 
     - name: Resolve Commit SHA

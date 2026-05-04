@@ -685,8 +685,19 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `bot-detection` | Auto-detect bot actors and skip the build | No | `true` |
+| `bot-detection-mode` | Controls which identity is evaluated for bot detection (`smart`, `actor`, `pr-author`) | No | `smart` |
+
+#### Bot Detection Mode
+
+| Mode | Behavior |
+|------|----------|
+| `smart` | **Recommended default.** Uses PR author for `pull_request`/`pull_request_target` events, falls back to `github.actor` for all other events (push, release, etc.) |
+| `actor` | Always evaluates `github.actor` — preserves the original legacy behavior |
+| `pr-author` | Always evaluates the PR author when available, falls back to `github.actor` if no PR author exists |
 
 > **Tip:** When enabled, bot actors like `dependabot[bot]` and `renovate[bot]` are automatically detected. The build is gracefully skipped with a clear reason, preventing CI failures from missing secrets on bot-generated PRs. The job still shows a green check, making it safe to use as a required status check.
+
+> **Why `smart` mode?** With `actor` mode, a human-authored PR can be falsely skipped when a bot (e.g., Renovate) triggers a `synchronize` event — even though the PR author is human. `smart` mode prevents this false positive by evaluating the PR author instead of the triggering actor on PR events.
 
 ---
 
@@ -700,6 +711,8 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`, `release`, `skip`) |
 | `short-sha` | Short commit SHA used in tags |
 | `bot-detected` | Whether a bot actor was detected (`true`/`false`) |
+| `bot-evaluation-subject` | Which identity was evaluated for bot detection (`actor` or `pr-author`) |
+| `bot-evaluation-value` | The actual login value evaluated for bot detection |
 | `build-skip-reason` | Reason the build was skipped (bot or commit convention) |
 | `vulnerability-scan-completed` | Whether vulnerability scanning completed successfully |
 | `total-vulnerabilities` | Total number of vulnerabilities found |
