@@ -316,7 +316,7 @@ outputs:
     value: ${{ steps.commit-gate.outputs.commit-type }}
   
   bot-detected:
-    description: 'Whether a bot actor was detected (true/false). Only populated when bot-detection is enabled.'
+    description: 'Whether a bot was detected (true/false). Always set, even when bot-detection is disabled (returns false in that case).'
     value: ${{ steps.bot-gate.outputs.is-bot }}
 
   bot-evaluation-subject:
@@ -334,7 +334,7 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Detect Bot Actor
+    - name: Bot Detection Gate
       id: bot-gate
       shell: bash
       run: |
@@ -343,6 +343,16 @@ runs:
         EVENT_NAME="${{ github.event_name }}"
         BOT_DETECTION="${{ inputs.bot-detection }}"
         BOT_DETECTION_MODE="${{ inputs.bot-detection-mode }}"
+
+        # Validate bot-detection-mode
+        case "$BOT_DETECTION_MODE" in
+          smart|actor|pr-author)
+            ;;
+          *)
+            echo "❌ Invalid bot-detection-mode value: '${BOT_DETECTION_MODE}'. Allowed values: smart, actor, pr-author."
+            exit 1
+            ;;
+        esac
 
         if [ "$BOT_DETECTION" != "true" ]; then
           echo "is-bot=false" >> "$GITHUB_OUTPUT"
