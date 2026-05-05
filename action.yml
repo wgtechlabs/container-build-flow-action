@@ -320,11 +320,11 @@ outputs:
     value: ${{ steps.bot-gate.outputs.is-bot }}
 
   bot-evaluation-subject:
-    description: 'The identity evaluated for bot detection (actor or pr-author).'
+    description: 'The identity evaluated for bot detection (actor, pr-author, or none when detection is disabled).'
     value: ${{ steps.bot-gate.outputs.bot-evaluation-subject }}
 
   bot-evaluation-value:
-    description: 'The actual login value that was evaluated for bot detection (e.g., dependabot[bot] or warengonzaga).'
+    description: 'The actual login value that was evaluated for bot detection (e.g., dependabot[bot] or warengonzaga). Empty when detection is disabled.'
     value: ${{ steps.bot-gate.outputs.bot-evaluation-value }}
 
   build-skip-reason:
@@ -344,7 +344,15 @@ runs:
         BOT_DETECTION="${{ inputs.bot-detection }}"
         BOT_DETECTION_MODE="${{ inputs.bot-detection-mode }}"
 
-        # Validate bot-detection-mode
+        if [ "$BOT_DETECTION" != "true" ]; then
+          echo "is-bot=false" >> "$GITHUB_OUTPUT"
+          echo "bot-evaluation-subject=none" >> "$GITHUB_OUTPUT"
+          echo "bot-evaluation-value=" >> "$GITHUB_OUTPUT"
+          echo "ℹ️  Bot detection is disabled"
+          exit 0
+        fi
+
+        # Validate bot-detection-mode (only when bot-detection is enabled)
         case "$BOT_DETECTION_MODE" in
           smart|actor|pr-author)
             ;;
@@ -353,14 +361,6 @@ runs:
             exit 1
             ;;
         esac
-
-        if [ "$BOT_DETECTION" != "true" ]; then
-          echo "is-bot=false" >> "$GITHUB_OUTPUT"
-          echo "bot-evaluation-subject=actor" >> "$GITHUB_OUTPUT"
-          echo "bot-evaluation-value=${ACTOR}" >> "$GITHUB_OUTPUT"
-          echo "ℹ️  Bot detection is disabled"
-          exit 0
-        fi
 
         # Determine which subject to evaluate based on mode and event type
         SUBJECT="actor"

@@ -711,8 +711,8 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`, `release`, `skip`) |
 | `short-sha` | Short commit SHA used in tags |
 | `bot-detected` | Whether a bot actor was detected (`true`/`false`) |
-| `bot-evaluation-subject` | Which identity was evaluated for bot detection (`actor` or `pr-author`) |
-| `bot-evaluation-value` | The actual login value evaluated for bot detection |
+| `bot-evaluation-subject` | Which identity was evaluated for bot detection (`actor`, `pr-author`, or `none` when detection is disabled) |
+| `bot-evaluation-value` | The actual login value evaluated for bot detection (empty when detection is disabled) |
 | `build-skip-reason` | Reason the build was skipped (bot or commit convention) |
 | `vulnerability-scan-completed` | Whether vulnerability scanning completed successfully |
 | `total-vulnerabilities` | Total number of vulnerabilities found |
