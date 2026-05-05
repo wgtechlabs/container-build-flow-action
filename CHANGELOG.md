@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.8.1] - 2026-05-05
+
+### Changed
+
+- fix validation order and disabled-state outputs
+- fix bot-detection false skips on human-authored PRs (#43)
+
 ## [1.8.0] - 2026-05-02
 
 ### Added
