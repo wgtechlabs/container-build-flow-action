@@ -20,21 +20,30 @@ output_value() {
 
 run_detect() {
     local planned_tag="$1"
+    local release_tag_pattern="${2:-}"
+    local tag_prefix="${3-release-}"
+    local tag_suffix="${4--alpine}"
     local output_file
+    local -a env_args
     output_file="$(mktemp)"
 
-    GITHUB_EVENT_NAME=push \
-    GITHUB_REF=refs/heads/main \
-    GITHUB_SHA="$SHA" \
-    GITHUB_REPOSITORY=example/widget \
-    GITHUB_REPOSITORY_OWNER=example \
-    GITHUB_OUTPUT="$output_file" \
-    MAIN_BRANCH=main \
-    DEV_BRANCH=dev \
-    PLANNED_VERSION_TAG="$planned_tag" \
-    TAG_PREFIX="release-" \
-    TAG_SUFFIX="-alpine" \
-    bash "$DETECT_SCRIPT" >/dev/null
+    env_args=(
+        GITHUB_EVENT_NAME=push
+        GITHUB_REF=refs/heads/main
+        GITHUB_SHA="$SHA"
+        GITHUB_REPOSITORY=example/widget
+        GITHUB_REPOSITORY_OWNER=example
+        GITHUB_OUTPUT="$output_file"
+        MAIN_BRANCH=main
+        DEV_BRANCH=dev
+        PLANNED_VERSION_TAG="$planned_tag"
+        TAG_PREFIX="$tag_prefix"
+        TAG_SUFFIX="$tag_suffix"
+    )
+    if [ -n "$release_tag_pattern" ]; then
+        env_args+=(RELEASE_TAG_PATTERN="$release_tag_pattern")
+    fi
+    env "${env_args[@]}" bash "$DETECT_SCRIPT" >/dev/null
 
     cat "$output_file"
     rm -f "$output_file"
@@ -56,6 +65,14 @@ assert_planned_main_release() {
         fail "planned tag must include latest"
 }
 
+assert_planned_custom_pattern_preserves_version_prefix() {
+    local output
+    output="$(run_detect version-1.2.3 '^version-[0-9]+\.[0-9]+\.[0-9]+$' "" "")"
+
+    [[ "$(printf '%s\n' "$output" | grep '^tags=' | cut -d= -f2-)" == "version-1.2.3" ]] ||
+        fail "planned tags that do not start with v followed by a digit must remain unchanged"
+}
+
 assert_planned_main_prerelease() {
     local output
     output="$(run_detect v1.2.3-rc.1)"
@@ -68,6 +85,19 @@ assert_planned_main_prerelease() {
         fail "planned prerelease tag must include its channel tag"
     if printf '%s\n' "$output" | grep -Eq '^type=raw,value=release-(1\.2|1|latest)-alpine$'; then
         fail "planned prerelease tag must not include production floating tags"
+    fi
+}
+
+assert_planned_numeric_prerelease() {
+    local output
+    output="$(run_detect v1.2.3-1)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^tags=' | cut -d= -f2-)" == "release-1.2.3-1-alpine" ]] ||
+        fail "planned numeric prerelease must use its exact version tag"
+    [[ "$(printf '%s\n' "$output" | grep -c '^type=raw,value=release-1-alpine$')" == "1" ]] ||
+        fail "planned numeric prerelease must include only its numeric channel tag"
+    if printf '%s\n' "$output" | grep -Eq '^type=raw,value=release-(1\.2|latest)-alpine$'; then
+        fail "planned numeric prerelease must not include production floating tags"
     fi
 }
 
@@ -150,10 +180,21 @@ assert_registry_aggregation() {
         fail "both selected registry failures must report artifact-published=false"
 }
 
+assert_no_push_registry_aggregation() {
+    local output
+    output="$(run_output both false false false)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^artifact-published=' | cut -d= -f2-)" == "false" ]] ||
+        fail "no-push builds with no registry results must report artifact-published=false"
+}
+
 assert_planned_main_release
+assert_planned_custom_pattern_preserves_version_prefix
 assert_planned_main_prerelease
+assert_planned_numeric_prerelease
 assert_omitted_planned_tag_stages_main
 assert_invalid_planned_tag_skips_main
 assert_registry_aggregation
+assert_no_push_registry_aggregation
 
 echo "PASS: container build flow behavior"

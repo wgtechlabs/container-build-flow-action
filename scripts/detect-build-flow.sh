@@ -104,7 +104,7 @@ get_repo_name() {
 # Extract prerelease identifier from semver (e.g., "beta" from "1.2.3-beta.1")
 extract_prerelease_id() {
     local version="$1"
-    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z][0-9A-Za-z-]*) ]]; then
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([0-9A-Za-z-]+) ]]; then
         echo "${BASH_REMATCH[1]}"
     else
         echo ""
@@ -227,7 +227,7 @@ detect_build_flow() {
                     log_warning "Skipping build: tag '${PLANNED_VERSION_TAG}' does not match pattern '${RELEASE_TAG_PATTERN}'"
                     flow_type="skip"
                 else
-                    if [[ "$PLANNED_VERSION_TAG" == v* ]]; then
+                    if [[ "$PLANNED_VERSION_TAG" =~ ^v[0-9] ]]; then
                         release_version="${PLANNED_VERSION_TAG#v}"
                     else
                         release_version="$PLANNED_VERSION_TAG"
