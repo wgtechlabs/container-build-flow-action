@@ -104,7 +104,7 @@ get_repo_name() {
 # Extract prerelease identifier from semver (e.g., "beta" from "1.2.3-beta.1")
 extract_prerelease_id() {
     local version="$1"
-    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([0-9A-Za-z-]+) ]]; then
+    if [[ "$version" =~ [0-9]+\.[0-9]+\.[0-9]+-([0-9A-Za-z-]+) ]]; then
         echo "${BASH_REMATCH[1]}"
     else
         echo ""
@@ -232,7 +232,7 @@ detect_build_flow() {
                     else
                         release_version="$PLANNED_VERSION_TAG"
                     fi
-                    if [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+                    if [[ "$release_version" =~ [0-9]+\.[0-9]+\.[0-9]+- ]]; then
                         RELEASE_PRERELEASE=true
                     else
                         RELEASE_PRERELEASE=false
@@ -321,32 +321,28 @@ detect_build_flow() {
         log_debug "  Primary tag: ${full_tag}"
 
         # Generate additional tags for releases
-        if parse_semver "$release_version"; then
-            if [ "$RELEASE_PRERELEASE" = "true" ]; then
-                # Pre-release: add channel tag (e.g., "beta" from "1.2.3-beta.1")
-                local prerelease_id
-                prerelease_id=$(extract_prerelease_id "$release_version")
-                if [ -n "$prerelease_id" ]; then
-                    extra_tags="type=raw,value=${TAG_PREFIX}${prerelease_id}${TAG_SUFFIX}"
-                    log_debug "  Pre-release channel tag: ${prerelease_id}"
-                fi
-            else
-                # Standard release: add major, minor, and latest tags
-                extra_tags="type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}.${SEMVER_MINOR}${TAG_SUFFIX}"
-                extra_tags="${extra_tags}
-type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}${TAG_SUFFIX}"
-                extra_tags="${extra_tags}
-type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
-                log_debug "  Minor tag: ${SEMVER_MAJOR}.${SEMVER_MINOR}"
-                log_debug "  Major tag: ${SEMVER_MAJOR}"
-                log_debug "  Latest tag: latest"
+        if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            # Pre-release: add channel tag (e.g., "beta" from "1.2.3-beta.1")
+            local prerelease_id
+            prerelease_id=$(extract_prerelease_id "$release_version")
+            if [ -n "$prerelease_id" ]; then
+                extra_tags="type=raw,value=${TAG_PREFIX}${prerelease_id}${TAG_SUFFIX}"
+                log_debug "  Pre-release channel tag: ${prerelease_id}"
             fi
+        elif parse_semver "$release_version"; then
+            # Standard release: add major, minor, and latest tags
+            extra_tags="type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}.${SEMVER_MINOR}${TAG_SUFFIX}"
+            extra_tags="${extra_tags}
+type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}${TAG_SUFFIX}"
+            extra_tags="${extra_tags}
+type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
+            log_debug "  Minor tag: ${SEMVER_MAJOR}.${SEMVER_MINOR}"
+            log_debug "  Major tag: ${SEMVER_MAJOR}"
+            log_debug "  Latest tag: latest"
         else
             # Non-semver tag: just use the version as-is, add latest for non-prerelease
-            if [ "$RELEASE_PRERELEASE" != "true" ]; then
-                extra_tags="type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
-                log_debug "  Latest tag: latest"
-            fi
+            extra_tags="type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
+            log_debug "  Latest tag: latest"
         fi
     else
         # Non-release flows: existing behavior

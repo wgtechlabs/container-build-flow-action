@@ -38,6 +38,8 @@ REGISTRY="${REGISTRY:-both}"
 DOCKERHUB_PUBLISHED="${DOCKERHUB_PUBLISHED:-false}"
 GHCR_PUBLISHED="${GHCR_PUBLISHED:-false}"
 PUSH_ENABLED="${PUSH_ENABLED:-true}"
+DOCKERHUB_BUILD_OUTCOME="${DOCKERHUB_BUILD_OUTCOME:-}"
+GHCR_BUILD_OUTCOME="${GHCR_BUILD_OUTCOME:-}"
 DOCKERHUB_IMAGE_TAGS="${DOCKERHUB_IMAGE_TAGS:-}"
 GHCR_IMAGE_TAGS="${GHCR_IMAGE_TAGS:-}"
 
@@ -217,6 +219,23 @@ normalize_publish_results() {
     fi
 }
 
+selected_build_succeeded() {
+    case "$REGISTRY" in
+        docker-hub)
+            [ "$DOCKERHUB_BUILD_OUTCOME" = "success" ]
+            ;;
+        ghcr)
+            [ "$GHCR_BUILD_OUTCOME" = "success" ]
+            ;;
+        both)
+            [ "$DOCKERHUB_BUILD_OUTCOME" = "success" ] || [ "$GHCR_BUILD_OUTCOME" = "success" ]
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # =============================================================================
 # VALIDATION
 # =============================================================================
@@ -322,6 +341,10 @@ main() {
     echo ""
     if [ "$PUSH_ENABLED" = "true" ] && [ "$ARTIFACT_PUBLISHED" != "true" ]; then
         log_error "All selected registry publish attempts failed"
+        exit 1
+    fi
+    if [ "$PUSH_ENABLED" != "true" ] && ! selected_build_succeeded; then
+        log_error "All selected registry build attempts failed"
         exit 1
     fi
 

@@ -101,6 +101,19 @@ assert_planned_numeric_prerelease() {
     fi
 }
 
+assert_planned_custom_pattern_prerelease() {
+    local output
+    output="$(run_detect prefix-1.2.3-rc.1 '^prefix-[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9.-]+$' "" "")"
+
+    [[ "$(printf '%s\n' "$output" | grep '^tags=' | cut -d= -f2-)" == "prefix-1.2.3-rc.1" ]] ||
+        fail "custom-pattern prerelease must use its exact version tag"
+    printf '%s\n' "$output" | grep -q '^type=raw,value=rc$' ||
+        fail "custom-pattern prerelease must include its channel tag"
+    if printf '%s\n' "$output" | grep -q '^type=raw,value=latest$'; then
+        fail "custom-pattern prerelease must not include latest"
+    fi
+}
+
 assert_omitted_planned_tag_stages_main() {
     local output
     output="$(run_detect "")"
@@ -122,6 +135,8 @@ run_output() {
     local dockerhub_published="$2"
     local ghcr_published="$3"
     local push_enabled="$4"
+    local dockerhub_build_outcome="${5:-success}"
+    local ghcr_build_outcome="${6:-success}"
     local output_file
     local dockerhub_tags=""
     local ghcr_tags=""
@@ -141,6 +156,8 @@ run_output() {
         REGISTRY="$registry" \
         DOCKERHUB_PUBLISHED="$dockerhub_published" \
         GHCR_PUBLISHED="$ghcr_published" \
+        DOCKERHUB_BUILD_OUTCOME="$dockerhub_build_outcome" \
+        GHCR_BUILD_OUTCOME="$ghcr_build_outcome" \
         PUSH_ENABLED="$push_enabled" \
         DOCKERHUB_IMAGE_TAGS="$dockerhub_tags" \
         GHCR_IMAGE_TAGS="$ghcr_tags" \
@@ -182,16 +199,21 @@ assert_registry_aggregation() {
 
 assert_no_push_registry_aggregation() {
     local output
-    output="$(run_output both false false false)"
+    output="$(run_output both false false false success failure)"
 
     [[ "$(printf '%s\n' "$output" | grep '^artifact-published=' | cut -d= -f2-)" == "false" ]] ||
         fail "no-push builds with no registry results must report artifact-published=false"
+
+    if output="$(run_output both false false false failure failure)"; then
+        fail "no-push builds must fail when all selected builds fail"
+    fi
 }
 
 assert_planned_main_release
 assert_planned_custom_pattern_preserves_version_prefix
 assert_planned_main_prerelease
 assert_planned_numeric_prerelease
+assert_planned_custom_pattern_prerelease
 assert_omitted_planned_tag_stages_main
 assert_invalid_planned_tag_skips_main
 assert_registry_aggregation
