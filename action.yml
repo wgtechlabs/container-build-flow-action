@@ -436,7 +436,7 @@ runs:
           echo "⚠️  Skipping build — ${BOT_SKIP_REASON}"
           exit 0
         fi
-        if [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/${MAIN_BRANCH}" ] && [ -n "$PLANNED_VERSION_TAG" ]; then
+        if { [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; } && [ "$REF" = "refs/heads/${MAIN_BRANCH}" ] && [ -n "$PLANNED_VERSION_TAG" ]; then
           echo "should-build=true" >> "$GITHUB_OUTPUT"
           echo "ℹ️  Planned version tag detected on main branch — bypassing commit convention gate"
           exit 0

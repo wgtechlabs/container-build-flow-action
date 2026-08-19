@@ -132,7 +132,7 @@ All flow types use **commit SHA** (first 7 characters) for tagging, ensuring tra
 
 ### Planned main-branch releases
 
-On a push to the configured `main-branch`, set `planned-version-tag` to publish release tags without changing the event from `push`. The full value must match `release-tag-pattern`; a matching `v1.2.3` produces `1.2.3`, `1.2`, `1`, and `latest` tags (with any configured prefix or suffix). An invalid value is skipped using the same behavior as an invalid release-event tag. Omit the input to retain the normal `staging-{sha}` main-branch build.
+On a push to, or `workflow_dispatch` run from, the configured `main-branch`, set `planned-version-tag` to publish release tags. The full value must match `release-tag-pattern`; a matching `v1.2.3` produces `1.2.3`, `1.2`, `1`, and `latest` tags (with any configured prefix or suffix). An invalid value is skipped using the same behavior as an invalid release-event tag. Omit the input to retain the normal `staging-{sha}` main-branch push build or the existing manual WIP build.
 
 ```yaml
 - uses: wgtechlabs/container-build-flow-action@v1
@@ -634,7 +634,7 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 |-------|-------------|----------|---------|
 | `main-branch` | Name of main/production branch | No | `main` |
 | `dev-branch` | Name of development branch | No | `dev` |
-| `planned-version-tag` | Release tag to publish on a main-branch push; must match `release-tag-pattern` | No | `''` |
+| `planned-version-tag` | Release tag to publish on a main-branch push or manual dispatch; must match `release-tag-pattern` | No | `''` |
 
 ### Build Configuration
 

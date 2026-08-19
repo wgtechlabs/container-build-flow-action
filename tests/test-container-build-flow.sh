@@ -23,12 +23,13 @@ run_detect() {
     local release_tag_pattern="${2:-}"
     local tag_prefix="${3-release-}"
     local tag_suffix="${4--alpine}"
+    local event_name="${5:-push}"
     local output_file
     local -a env_args
     output_file="$(mktemp)"
 
     env_args=(
-        GITHUB_EVENT_NAME=push
+        GITHUB_EVENT_NAME="$event_name"
         GITHUB_REF=refs/heads/main
         GITHUB_SHA="$SHA"
         GITHUB_REPOSITORY=example/widget
@@ -37,6 +38,7 @@ run_detect() {
         MAIN_BRANCH=main
         DEV_BRANCH=dev
         PLANNED_VERSION_TAG="$planned_tag"
+        RELEASE_TAG="$planned_tag"
         TAG_PREFIX="$tag_prefix"
         TAG_SUFFIX="$tag_suffix"
     )
@@ -128,6 +130,40 @@ assert_invalid_planned_tag_skips_main() {
 
     [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "skip" ]] ||
         fail "main pushes with an invalid planned tag must skip"
+}
+
+assert_planned_dispatch_release() {
+    local output
+    output="$(run_detect v1.2.3 "" "" "" workflow_dispatch)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "release" ]] ||
+        fail "planned tag must produce a release flow when dispatching main"
+    [[ "$(printf '%s\n' "$output" | grep '^tags=' | cut -d= -f2-)" == "1.2.3" ]] ||
+        fail "planned dispatch tag must generate its release version"
+}
+
+assert_omitted_planned_tag_keeps_dispatch_wip() {
+    local output
+    output="$(run_detect "" "" "" "" workflow_dispatch)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "wip" ]] ||
+        fail "manual main dispatches without a planned tag must remain WIP"
+}
+
+assert_invalid_planned_dispatch_skips_main() {
+    local output
+    output="$(run_detect invalid-tag "" "" "" workflow_dispatch)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "skip" ]] ||
+        fail "invalid planned tags must skip when dispatching main"
+}
+
+assert_release_event_remains_release() {
+    local output
+    output="$(run_detect v1.2.3 "" "" "" release)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "release" ]] ||
+        fail "release events must remain release flows"
 }
 
 run_output() {
@@ -309,6 +345,14 @@ assert_push_enabled_normalization_contract() {
         fail "aggregate failure guard must use canonical push-enabled"
 }
 
+assert_planned_dispatch_bypasses_commit_gate() {
+    local commit_gate
+    commit_gate="$(action_step "Commit Convention Gate")"
+
+    [[ "$commit_gate" == *'workflow_dispatch'* ]] ||
+        fail "planned main dispatches must bypass the commit convention gate"
+}
+
 assert_planned_main_release
 assert_planned_custom_pattern_preserves_version_prefix
 assert_planned_main_prerelease
@@ -316,9 +360,14 @@ assert_planned_numeric_prerelease
 assert_planned_custom_pattern_prerelease
 assert_omitted_planned_tag_stages_main
 assert_invalid_planned_tag_skips_main
+assert_planned_dispatch_release
+assert_omitted_planned_tag_keeps_dispatch_wip
+assert_invalid_planned_dispatch_skips_main
+assert_release_event_remains_release
 assert_registry_aggregation
 assert_no_push_registry_aggregation
 assert_registry_builds_require_successful_logins_when_pushing
 assert_push_enabled_normalization_contract
+assert_planned_dispatch_bypasses_commit_gate
 
 echo "PASS: container build flow behavior"
