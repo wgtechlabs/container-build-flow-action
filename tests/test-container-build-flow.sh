@@ -56,6 +56,21 @@ assert_planned_main_release() {
         fail "planned tag must include latest"
 }
 
+assert_planned_main_prerelease() {
+    local output
+    output="$(run_detect v1.2.3-rc.1)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "release" ]] ||
+        fail "planned prerelease tag must produce a release flow"
+    [[ "$(printf '%s\n' "$output" | grep '^tags=' | cut -d= -f2-)" == "release-1.2.3-rc.1-alpine" ]] ||
+        fail "planned prerelease tag must use its exact version tag"
+    printf '%s\n' "$output" | grep -q '^type=raw,value=release-rc-alpine$' ||
+        fail "planned prerelease tag must include its channel tag"
+    if printf '%s\n' "$output" | grep -Eq '^type=raw,value=release-(1\.2|1|latest)-alpine$'; then
+        fail "planned prerelease tag must not include production floating tags"
+    fi
+}
+
 assert_omitted_planned_tag_stages_main() {
     local output
     output="$(run_detect "")"
@@ -136,6 +151,7 @@ assert_registry_aggregation() {
 }
 
 assert_planned_main_release
+assert_planned_main_prerelease
 assert_omitted_planned_tag_stages_main
 assert_invalid_planned_tag_skips_main
 assert_registry_aggregation

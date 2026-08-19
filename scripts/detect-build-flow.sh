@@ -232,6 +232,11 @@ detect_build_flow() {
                     else
                         release_version="$PLANNED_VERSION_TAG"
                     fi
+                    if [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+                        RELEASE_PRERELEASE=true
+                    else
+                        RELEASE_PRERELEASE=false
+                    fi
                     flow_type="release"
                     log_success "Flow: Planned production release (${release_version})"
                 fi
