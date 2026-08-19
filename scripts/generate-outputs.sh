@@ -35,6 +35,13 @@ BUILD_FLOW_TYPE="${BUILD_FLOW_TYPE:-}"
 IMAGE_TAGS="${IMAGE_TAGS:-}"
 SHORT_SHA="${SHORT_SHA:-}"
 REGISTRY="${REGISTRY:-both}"
+DOCKERHUB_PUBLISHED="${DOCKERHUB_PUBLISHED:-false}"
+GHCR_PUBLISHED="${GHCR_PUBLISHED:-false}"
+PUSH_ENABLED="${PUSH_ENABLED:-true}"
+DOCKERHUB_BUILD_OUTCOME="${DOCKERHUB_BUILD_OUTCOME:-}"
+GHCR_BUILD_OUTCOME="${GHCR_BUILD_OUTCOME:-}"
+DOCKERHUB_IMAGE_TAGS="${DOCKERHUB_IMAGE_TAGS:-}"
+GHCR_IMAGE_TAGS="${GHCR_IMAGE_TAGS:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -158,6 +165,78 @@ format_build_digest() {
 }
 
 # =============================================================================
+# PUBLISH RESULTS
+# =============================================================================
+
+normalize_publish_results() {
+    case "$REGISTRY" in
+        docker-hub)
+            GHCR_PUBLISHED="false"
+            ;;
+        ghcr)
+            DOCKERHUB_PUBLISHED="false"
+            ;;
+        both)
+            ;;
+        *)
+            log_warning "Unknown registry type: ${REGISTRY}"
+            DOCKERHUB_PUBLISHED="false"
+            GHCR_PUBLISHED="false"
+            ;;
+    esac
+
+    if [ "$DOCKERHUB_PUBLISHED" != "true" ]; then
+        DOCKERHUB_PUBLISHED="false"
+    fi
+    if [ "$GHCR_PUBLISHED" != "true" ]; then
+        GHCR_PUBLISHED="false"
+    fi
+
+    if [ "$DOCKERHUB_PUBLISHED" = "true" ] || [ "$GHCR_PUBLISHED" = "true" ]; then
+        ARTIFACT_PUBLISHED="true"
+    else
+        ARTIFACT_PUBLISHED="false"
+    fi
+
+    if [ "$ARTIFACT_PUBLISHED" = "true" ]; then
+        IMAGE_TAGS=""
+        PUBLISHED_IMAGE=""
+        if [ "$DOCKERHUB_PUBLISHED" = "true" ]; then
+            IMAGE_TAGS="$DOCKERHUB_IMAGE_TAGS"
+            PUBLISHED_IMAGE=$(printf '%s\n' "$DOCKERHUB_IMAGE_TAGS" | head -n1)
+        fi
+        if [ "$GHCR_PUBLISHED" = "true" ]; then
+            IMAGE_TAGS="${IMAGE_TAGS:+${IMAGE_TAGS}$'\n'}${GHCR_IMAGE_TAGS}"
+            if [ -z "$PUBLISHED_IMAGE" ]; then
+                PUBLISHED_IMAGE=$(printf '%s\n' "$GHCR_IMAGE_TAGS" | head -n1)
+            fi
+        fi
+    else
+        PUBLISHED_IMAGE=""
+        if [ "$PUSH_ENABLED" != "true" ]; then
+            IMAGE_TAGS="${DOCKERHUB_IMAGE_TAGS}${DOCKERHUB_IMAGE_TAGS:+$'\n'}${GHCR_IMAGE_TAGS}"
+        fi
+    fi
+}
+
+selected_build_succeeded() {
+    case "$REGISTRY" in
+        docker-hub)
+            [ "$DOCKERHUB_BUILD_OUTCOME" = "success" ]
+            ;;
+        ghcr)
+            [ "$GHCR_BUILD_OUTCOME" = "success" ]
+            ;;
+        both)
+            [ "$DOCKERHUB_BUILD_OUTCOME" = "success" ] || [ "$GHCR_BUILD_OUTCOME" = "success" ]
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# =============================================================================
 # VALIDATION
 # =============================================================================
 
@@ -195,6 +274,8 @@ validate_inputs() {
 generate_outputs() {
     log_info "Generating GitHub Actions outputs..."
     
+    normalize_publish_results
+
     # Process all outputs
     local formatted_tags registry_urls formatted_digest
     
@@ -212,6 +293,10 @@ generate_outputs() {
             echo "build-digest=${formatted_digest}"
             echo "build-flow-type=${BUILD_FLOW_TYPE}"
             echo "short-sha=${SHORT_SHA}"
+            echo "dockerhub-published=${DOCKERHUB_PUBLISHED}"
+            echo "ghcr-published=${GHCR_PUBLISHED}"
+            echo "artifact-published=${ARTIFACT_PUBLISHED}"
+            echo "published-image=${PUBLISHED_IMAGE}"
         } >> "$GITHUB_OUTPUT"
         
         log_success "Outputs written to GitHub Actions"
@@ -226,6 +311,9 @@ generate_outputs() {
     echo -e "  ${CYAN}Short SHA:${NC} ${SHORT_SHA}"
     echo -e "  ${CYAN}Image Tags:${NC} ${formatted_tags}"
     echo -e "  ${CYAN}Build Digest:${NC} ${formatted_digest}"
+    echo -e "  ${CYAN}Docker Hub Published:${NC} ${DOCKERHUB_PUBLISHED}"
+    echo -e "  ${CYAN}GHCR Published:${NC} ${GHCR_PUBLISHED}"
+    echo -e "  ${CYAN}Artifact Published:${NC} ${ARTIFACT_PUBLISHED}"
     echo ""
     echo -e "  ${CYAN}Registry URLs:${NC}"
     echo "$registry_urls" | while IFS= read -r line; do
@@ -251,6 +339,15 @@ main() {
     generate_outputs
     
     echo ""
+    if [ "$PUSH_ENABLED" = "true" ] && [ "$ARTIFACT_PUBLISHED" != "true" ]; then
+        log_error "All selected registry publish attempts failed"
+        exit 1
+    fi
+    if [ "$PUSH_ENABLED" != "true" ] && ! selected_build_succeeded; then
+        log_error "All selected registry build attempts failed"
+        exit 1
+    fi
+
     log_success "Step 4: Output generation complete!"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
