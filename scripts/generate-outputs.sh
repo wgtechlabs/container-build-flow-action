@@ -169,6 +169,8 @@ format_build_digest() {
 # =============================================================================
 
 normalize_publish_results() {
+    local newline=$'\n'
+
     case "$REGISTRY" in
         docker-hub)
             GHCR_PUBLISHED="false"
@@ -206,7 +208,7 @@ normalize_publish_results() {
             PUBLISHED_IMAGE=$(printf '%s\n' "$DOCKERHUB_IMAGE_TAGS" | head -n1)
         fi
         if [ "$GHCR_PUBLISHED" = "true" ]; then
-            IMAGE_TAGS="${IMAGE_TAGS:+${IMAGE_TAGS}$'\n'}${GHCR_IMAGE_TAGS}"
+            IMAGE_TAGS="${IMAGE_TAGS:+${IMAGE_TAGS}${newline}}${GHCR_IMAGE_TAGS}"
             if [ -z "$PUBLISHED_IMAGE" ]; then
                 PUBLISHED_IMAGE=$(printf '%s\n' "$GHCR_IMAGE_TAGS" | head -n1)
             fi
@@ -214,7 +216,7 @@ normalize_publish_results() {
     else
         PUBLISHED_IMAGE=""
         if [ "$PUSH_ENABLED" != "true" ]; then
-            IMAGE_TAGS="${DOCKERHUB_IMAGE_TAGS}${DOCKERHUB_IMAGE_TAGS:+$'\n'}${GHCR_IMAGE_TAGS}"
+            IMAGE_TAGS="${DOCKERHUB_IMAGE_TAGS}${DOCKERHUB_IMAGE_TAGS:+${newline}}${GHCR_IMAGE_TAGS}"
         fi
     fi
 }

@@ -225,6 +225,8 @@ detect_build_flow() {
 
                 if [[ -n "${RELEASE_TAG_PATTERN}" ]] && ! [[ "${PLANNED_VERSION_TAG}" =~ ${RELEASE_TAG_PATTERN} ]]; then
                     log_warning "Skipping build: tag '${PLANNED_VERSION_TAG}' does not match pattern '${RELEASE_TAG_PATTERN}'"
+                    # Surface the rejected planned tag in the skip summary
+                    RELEASE_TAG="$PLANNED_VERSION_TAG"
                     flow_type="skip"
                 else
                     if [[ "$PLANNED_VERSION_TAG" =~ ^v[0-9] ]]; then
