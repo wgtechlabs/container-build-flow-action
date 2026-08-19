@@ -64,6 +64,14 @@ assert_omitted_planned_tag_stages_main() {
         fail "main pushes without a planned tag must remain staging"
 }
 
+assert_invalid_planned_tag_skips_main() {
+    local output
+    output="$(run_detect invalid-tag)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "skip" ]] ||
+        fail "main pushes with an invalid planned tag must skip"
+}
+
 run_output() {
     local registry="$1"
     local dockerhub_published="$2"
@@ -129,6 +137,7 @@ assert_registry_aggregation() {
 
 assert_planned_main_release
 assert_omitted_planned_tag_stages_main
+assert_invalid_planned_tag_skips_main
 assert_registry_aggregation
 
 echo "PASS: container build flow behavior"

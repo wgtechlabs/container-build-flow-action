@@ -12,6 +12,7 @@
     "declaration": false,
     "sourceMap": false,
     "noEmit": true,
+    "ignoreDeprecations": "6.0",
     "moduleResolution": "node"
   },
   "include": ["src/**/*.ts"],
