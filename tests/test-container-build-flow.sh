@@ -37,11 +37,17 @@ run_detect() {
         GITHUB_OUTPUT="$output_file"
         MAIN_BRANCH=main
         DEV_BRANCH=dev
-        PLANNED_VERSION_TAG="$planned_tag"
-        RELEASE_TAG="$planned_tag"
         TAG_PREFIX="$tag_prefix"
         TAG_SUFFIX="$tag_suffix"
     )
+    # Release events receive their tag through RELEASE_TAG only; every other
+    # event goes through PLANNED_VERSION_TAG. Keeping them separate prevents the
+    # tests from masking a flow that reads the wrong variable.
+    if [ "$event_name" = "release" ]; then
+        env_args+=(RELEASE_TAG="$planned_tag")
+    else
+        env_args+=(PLANNED_VERSION_TAG="$planned_tag")
+    fi
     if [ -n "$release_tag_pattern" ]; then
         env_args+=(RELEASE_TAG_PATTERN="$release_tag_pattern")
     fi

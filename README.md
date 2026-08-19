@@ -634,7 +634,7 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 |-------|-------------|----------|---------|
 | `main-branch` | Name of main/production branch | No | `main` |
 | `dev-branch` | Name of development branch | No | `dev` |
-| `planned-version-tag` | Release tag to publish on a main-branch push or manual dispatch; must match `release-tag-pattern` | No | `''` |
+| `planned-version-tag` | Release tag to publish on a main-branch push, or on a `workflow_dispatch` run from the main branch; ignored on other refs and must match `release-tag-pattern` | No | `''` |
 
 ### Build Configuration
 
