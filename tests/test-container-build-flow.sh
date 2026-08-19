@@ -244,10 +244,69 @@ assert_registry_builds_require_successful_logins_when_pushing() {
         fail "Docker Hub login must remain independently attempted"
     [[ "$ghcr_login" == *"continue-on-error: true"* ]] ||
         fail "GHCR login must remain independently attempted"
-    [[ "$dockerhub_build" == *"inputs.push-enabled != 'true' || steps.dockerhub-login.outcome == 'success'"* ]] ||
+    [[ "$dockerhub_build" == *"steps.push-enabled.outputs.value != 'true' || steps.dockerhub-login.outcome == 'success'"* ]] ||
         fail "Docker Hub push builds must require a successful Docker Hub login"
-    [[ "$ghcr_build" == *"inputs.push-enabled != 'true' || steps.ghcr-login.outcome == 'success'"* ]] ||
+    [[ "$ghcr_build" == *"steps.push-enabled.outputs.value != 'true' || steps.ghcr-login.outcome == 'success'"* ]] ||
         fail "GHCR push builds must require a successful GHCR login"
+}
+
+assert_push_enabled_normalization_contract() {
+    local normalizer
+    local dockerhub_login
+    local ghcr_login
+    local dockerhub_build
+    local ghcr_build
+    local outputs
+    local failure_guard
+
+    normalizer="$(action_step "Normalize Push Enabled")"
+    dockerhub_login="$(action_step "Login to Docker Hub")"
+    ghcr_login="$(action_step "Login to GitHub Container Registry")"
+    dockerhub_build="$(action_step "Build and Push Docker Hub Image")"
+    ghcr_build="$(action_step "Build and Push GHCR Image")"
+    outputs="$(action_step "Generate Action Outputs")"
+    failure_guard="$(action_step "Fail if all selected registry attempts failed")"
+
+    [[ "$normalizer" == *"id: push-enabled"* ]] ||
+        fail "push-enabled must have a stable normalizer step ID"
+    [[ "$normalizer" == *"!cancelled()"* ]] ||
+        fail "push-enabled normalizer must not run for canceled flows"
+    [[ "$normalizer" == *"steps.commit-gate.outputs.should-build != 'false'"* ]] ||
+        fail "push-enabled normalizer must not run for commit-gated flows"
+    [[ "$normalizer" == *"steps.detect.outputs.build-flow-type != 'skip'"* ]] ||
+        fail "push-enabled normalizer must not run for skipped flows"
+    [[ "$normalizer" == *"PUSH_ENABLED_INPUT: \${{ inputs.push-enabled }}"* ]] ||
+        fail "push-enabled normalizer must receive the raw action input"
+    [[ "$normalizer" == *'PUSH_ENABLED="${PUSH_ENABLED_INPUT#"${PUSH_ENABLED_INPUT%%[![:space:]]*}"}"'* ]] ||
+        fail "push-enabled normalizer must trim leading whitespace"
+    [[ "$normalizer" == *'PUSH_ENABLED="${PUSH_ENABLED%"${PUSH_ENABLED##*[![:space:]]}"}"'* ]] ||
+        fail "push-enabled normalizer must trim trailing whitespace"
+    [[ "$normalizer" == *'case "$PUSH_ENABLED" in'* && "$normalizer" == *"true|false)"* ]] ||
+        fail "push-enabled normalizer must reject values other than true or false"
+    [[ "$normalizer" == *'echo "value=${PUSH_ENABLED}" >> "$GITHUB_OUTPUT"'* ]] ||
+        fail "push-enabled normalizer must emit its canonical output"
+
+    [[ "$dockerhub_login" == *"steps.push-enabled.outputs.value == 'true'"* ]] ||
+        fail "Docker Hub login must use canonical push-enabled=true"
+    [[ "$ghcr_login" == *"steps.push-enabled.outputs.value == 'true'"* ]] ||
+        fail "GHCR login must use canonical push-enabled=true"
+    [[ "$dockerhub_build" == *"steps.push-enabled.outputs.value != 'true' || steps.dockerhub-login.outcome == 'success'"* ]] ||
+        fail "Docker Hub build must use canonical push-enabled for its login requirement"
+    [[ "$ghcr_build" == *"steps.push-enabled.outputs.value != 'true' || steps.ghcr-login.outcome == 'success'"* ]] ||
+        fail "GHCR build must use canonical push-enabled for its login requirement"
+    [[ "$dockerhub_build" == *'push: ${{ steps.push-enabled.outputs.value }}'* ]] ||
+        fail "Docker Hub build must use canonical push-enabled"
+    [[ "$ghcr_build" == *'push: ${{ steps.push-enabled.outputs.value }}'* ]] ||
+        fail "GHCR build must use canonical push-enabled"
+    [[ "$outputs" == *'PUSH_ENABLED: ${{ steps.push-enabled.outputs.value }}'* ]] ||
+        fail "output aggregation must receive canonical push-enabled"
+    [[ "$outputs" == *"steps.push-enabled.outputs.value == 'true' && steps.dockerhub-build.outcome == 'success'"* ]] ||
+        fail "Docker Hub publication aggregation must use canonical push-enabled"
+    [[ "$outputs" == *"steps.push-enabled.outputs.value == 'true' && steps.ghcr-build.outcome == 'success'"* ]] ||
+        fail "GHCR publication aggregation must use canonical push-enabled"
+    [[ "$failure_guard" == *"steps.push-enabled.outputs.value == 'true'"* &&
+       "$failure_guard" == *"steps.push-enabled.outputs.value != 'true'"* ]] ||
+        fail "aggregate failure guard must use canonical push-enabled"
 }
 
 assert_planned_main_release
@@ -260,5 +319,6 @@ assert_invalid_planned_tag_skips_main
 assert_registry_aggregation
 assert_no_push_registry_aggregation
 assert_registry_builds_require_successful_logins_when_pushing
+assert_push_enabled_normalization_contract
 
 echo "PASS: container build flow behavior"
