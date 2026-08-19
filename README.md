@@ -130,6 +130,16 @@ All flow types use **commit SHA** (first 7 characters) for tagging, ensuring tra
 
 > **Tip:** Enable `floating-tags: true` to also push a mutable `dev`, `pr`, `patch`, `staging`, or `wip` tag that always points to the latest build for that flow type — great for `docker-compose.yml` or Kubernetes manifests that should follow the tip of a branch without requiring manual SHA updates.
 
+### Planned main-branch releases
+
+On a push to the configured `main-branch`, set `planned-version-tag` to publish release tags without changing the event from `push`. The full value must match `release-tag-pattern`; a matching `v1.2.3` produces `1.2.3`, `1.2`, `1`, and `latest` tags (with any configured prefix or suffix). An invalid value is skipped using the same behavior as an invalid release-event tag. Omit the input to retain the normal `staging-{sha}` main-branch build.
+
+```yaml
+- uses: wgtechlabs/container-build-flow-action@v1
+  with:
+    planned-version-tag: v1.2.3
+```
+
 ---
 
 ## 🏷️ Tagging Strategy
@@ -241,6 +251,10 @@ jobs:
     registry: ghcr
     ghcr-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+### Independent registry publishing
+
+When `registry: both` is selected, Docker Hub and GHCR each receive an independent metadata, login, and build/push attempt. A failure in one does not prevent the other attempt. The action succeeds when either selected registry publishes successfully, and fails only after all selected publish attempts fail. Set `push-enabled: false` to build without publishing; this remains a successful no-push build.
 
 ### Custom Branch Names
 
@@ -620,6 +634,7 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 |-------|-------------|----------|---------|
 | `main-branch` | Name of main/production branch | No | `main` |
 | `dev-branch` | Name of development branch | No | `dev` |
+| `planned-version-tag` | Release tag to publish on a main-branch push; must match `release-tag-pattern` | No | `''` |
 
 ### Build Configuration
 
@@ -710,6 +725,9 @@ See the [`examples/`](examples/) directory for complete workflow examples:
 | `build-digest` | SHA256 digest of built image |
 | `build-flow-type` | Detected flow type (`pr`, `dev`, `patch`, `staging`, `wip`, `release`, `skip`) |
 | `short-sha` | Short commit SHA used in tags |
+| `dockerhub-published` | Whether Docker Hub successfully received an image (`true`/`false`) |
+| `ghcr-published` | Whether GHCR successfully received an image (`true`/`false`) |
+| `artifact-published` | Whether at least one selected registry successfully received an image (`true`/`false`) |
 | `bot-detected` | Whether a bot actor was detected (`true`/`false`) |
 | `bot-evaluation-subject` | Which identity was evaluated for bot detection (`actor`, `pr-author`, or `none` when detection is disabled) |
 | `bot-evaluation-value` | The actual login value evaluated for bot detection (empty when detection is disabled) |

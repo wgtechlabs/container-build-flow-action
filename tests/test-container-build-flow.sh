@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DETECT_SCRIPT="$ROOT/scripts/detect-build-flow.sh"
+OUTPUT_SCRIPT="$ROOT/scripts/generate-outputs.sh"
+SHA="0123456789abcdef"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+output_value() {
+    local file="$1"
+    local key="$2"
+    grep "^${key}=" "$file" | tail -n1 | cut -d= -f2-
+}
+
+run_detect() {
+    local planned_tag="$1"
+    local output_file
+    output_file="$(mktemp)"
+
+    GITHUB_EVENT_NAME=push \
+    GITHUB_REF=refs/heads/main \
+    GITHUB_SHA="$SHA" \
+    GITHUB_REPOSITORY=example/widget \
+    GITHUB_REPOSITORY_OWNER=example \
+    GITHUB_OUTPUT="$output_file" \
+    MAIN_BRANCH=main \
+    DEV_BRANCH=dev \
+    PLANNED_VERSION_TAG="$planned_tag" \
+    TAG_PREFIX="release-" \
+    TAG_SUFFIX="-alpine" \
+    bash "$DETECT_SCRIPT" >/dev/null
+
+    cat "$output_file"
+    rm -f "$output_file"
+}
+
+assert_planned_main_release() {
+    local output
+    output="$(run_detect v1.2.3)"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "release" ]] ||
+        fail "planned tag must produce a release flow"
+    [[ "$(printf '%s\n' "$output" | grep '^tags=' | cut -d= -f2-)" == "release-1.2.3-alpine" ]] ||
+        fail "planned tag must strip only its leading v and respect tag prefix/suffix"
+    printf '%s\n' "$output" | grep -q '^type=raw,value=release-1.2-alpine$' ||
+        fail "planned tag must include its minor release tag"
+    printf '%s\n' "$output" | grep -q '^type=raw,value=release-1-alpine$' ||
+        fail "planned tag must include its major release tag"
+    printf '%s\n' "$output" | grep -q '^type=raw,value=release-latest-alpine$' ||
+        fail "planned tag must include latest"
+}
+
+assert_omitted_planned_tag_stages_main() {
+    local output
+    output="$(run_detect "")"
+
+    [[ "$(printf '%s\n' "$output" | grep '^build-flow-type=' | cut -d= -f2-)" == "staging" ]] ||
+        fail "main pushes without a planned tag must remain staging"
+}
+
+run_output() {
+    local registry="$1"
+    local dockerhub_published="$2"
+    local ghcr_published="$3"
+    local push_enabled="$4"
+    local output_file
+    local dockerhub_tags=""
+    local ghcr_tags=""
+    output_file="$(mktemp)"
+
+    if [ "$dockerhub_published" = "true" ]; then
+        dockerhub_tags="example/widget:1.2.3"
+    fi
+    if [ "$ghcr_published" = "true" ]; then
+        ghcr_tags="ghcr.io/example/widget:1.2.3"
+    fi
+
+    if ! BUILD_DIGEST="sha256:example" \
+        BUILD_FLOW_TYPE=release \
+        IMAGE_TAGS="example/widget:1.2.3" \
+        SHORT_SHA="${SHA:0:7}" \
+        REGISTRY="$registry" \
+        DOCKERHUB_PUBLISHED="$dockerhub_published" \
+        GHCR_PUBLISHED="$ghcr_published" \
+        PUSH_ENABLED="$push_enabled" \
+        DOCKERHUB_IMAGE_TAGS="$dockerhub_tags" \
+        GHCR_IMAGE_TAGS="$ghcr_tags" \
+        GITHUB_OUTPUT="$output_file" \
+        bash "$OUTPUT_SCRIPT" >/dev/null; then
+        cat "$output_file"
+        rm -f "$output_file"
+        return 1
+    fi
+
+    cat "$output_file"
+    rm -f "$output_file"
+}
+
+assert_registry_aggregation() {
+    local output
+    output="$(run_output both false true true)"
+    [[ "$(printf '%s\n' "$output" | grep '^dockerhub-published=' | cut -d= -f2-)" == "false" ]] ||
+        fail "Docker Hub must report false when only GHCR succeeds"
+    [[ "$(printf '%s\n' "$output" | grep '^ghcr-published=' | cut -d= -f2-)" == "true" ]] ||
+        fail "GHCR must report true when it succeeds"
+    [[ "$(printf '%s\n' "$output" | grep '^artifact-published=' | cut -d= -f2-)" == "true" ]] ||
+        fail "a GHCR-only success must publish an artifact"
+    [[ "$(printf '%s\n' "$output" | grep '^image-tags=' | cut -d= -f2-)" == "ghcr.io/example/widget:1.2.3" ]] ||
+        fail "a GHCR-only success must expose only its GHCR image tag"
+
+    output="$(run_output both true false true)"
+    [[ "$(printf '%s\n' "$output" | grep '^artifact-published=' | cut -d= -f2-)" == "true" ]] ||
+        fail "a Docker Hub-only success must publish an artifact"
+    [[ "$(printf '%s\n' "$output" | grep '^image-tags=' | cut -d= -f2-)" == "example/widget:1.2.3" ]] ||
+        fail "a Docker Hub-only success must expose only its Docker Hub image tag"
+
+    if output="$(run_output both false false true)"; then
+        fail "both selected registry failures must fail after writing outputs"
+    fi
+    [[ "$(printf '%s\n' "$output" | grep '^artifact-published=' | cut -d= -f2-)" == "false" ]] ||
+        fail "both selected registry failures must report artifact-published=false"
+}
+
+assert_planned_main_release
+assert_omitted_planned_tag_stages_main
+assert_registry_aggregation
+
+echo "PASS: container build flow behavior"

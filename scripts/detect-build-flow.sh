@@ -48,6 +48,7 @@ GITHUB_BASE_REF="${GITHUB_BASE_REF:-}"
 RELEASE_TAG="${RELEASE_TAG:-}"
 RELEASE_PRERELEASE="${RELEASE_PRERELEASE:-false}"
 RELEASE_TAG_PATTERN="${RELEASE_TAG_PATTERN-^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$}"
+PLANNED_VERSION_TAG="${PLANNED_VERSION_TAG:-}"
 
 # User-configurable inputs (from action.yml)
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
@@ -162,6 +163,7 @@ detect_build_flow() {
     log_debug "Configuration:"
     log_debug "  Main Branch: ${MAIN_BRANCH}"
     log_debug "  Dev Branch: ${DEV_BRANCH}"
+    log_debug "  Planned Version Tag: ${PLANNED_VERSION_TAG:-<not set>}"
     
     local flow_type=""
     local release_version=""
@@ -215,10 +217,28 @@ detect_build_flow() {
             flow_type="dev"
             log_success "Flow: Push to dev branch"
             
-        # Push to main branch -> staging for pre-production validation
+        # Push to main branch -> staging, unless a validated release tag is planned
         elif [ "$branch" = "$MAIN_BRANCH" ]; then
-            flow_type="staging"
-            log_success "Flow: Push to main branch (staging)"
+            if [ -n "$PLANNED_VERSION_TAG" ]; then
+                log_debug "  Planned Version Tag: ${PLANNED_VERSION_TAG}"
+                log_debug "  Release Tag Pattern: ${RELEASE_TAG_PATTERN}"
+
+                if [[ -n "${RELEASE_TAG_PATTERN}" ]] && ! [[ "${PLANNED_VERSION_TAG}" =~ ${RELEASE_TAG_PATTERN} ]]; then
+                    log_warning "Skipping build: tag '${PLANNED_VERSION_TAG}' does not match pattern '${RELEASE_TAG_PATTERN}'"
+                    flow_type="skip"
+                else
+                    if [[ "$PLANNED_VERSION_TAG" == v* ]]; then
+                        release_version="${PLANNED_VERSION_TAG#v}"
+                    else
+                        release_version="$PLANNED_VERSION_TAG"
+                    fi
+                    flow_type="release"
+                    log_success "Flow: Planned production release (${release_version})"
+                fi
+            else
+                flow_type="staging"
+                log_success "Flow: Push to main branch (staging)"
+            fi
             
         # Push to any other branch -> wip-{sha}
         else

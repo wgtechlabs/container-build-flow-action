@@ -243,6 +243,11 @@ inputs:
     required: false
     default: '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'
 
+  planned-version-tag:
+    description: 'Release tag to publish for a push to the configured main branch. It must match release-tag-pattern.'
+    required: false
+    default: ''
+
   # Bot Detection
   bot-detection:
     description: 'Auto-detect bot actors (e.g., dependabot[bot], renovate[bot]) and skip the build. Prevents CI failures from missing secrets on bot-generated PRs.'
@@ -284,6 +289,18 @@ outputs:
   release-version:
     description: 'Clean version string from release tag (e.g., 1.2.3). Only populated for release flows.'
     value: ${{ steps.detect.outputs.release-version }}
+
+  dockerhub-published:
+    description: 'Whether an image was successfully pushed to Docker Hub (true/false).'
+    value: ${{ steps.output.outputs.dockerhub-published || 'false' }}
+
+  ghcr-published:
+    description: 'Whether an image was successfully pushed to GHCR (true/false).'
+    value: ${{ steps.output.outputs.ghcr-published || 'false' }}
+
+  artifact-published:
+    description: 'Whether at least one selected registry successfully received an image (true/false).'
+    value: ${{ steps.output.outputs.artifact-published || 'false' }}
 
   # Security Scanning Outputs
   vulnerability-scan-completed:
@@ -445,6 +462,7 @@ runs:
         RELEASE_TAG: ${{ github.event.release.tag_name }}
         RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         RELEASE_TAG_PATTERN: ${{ inputs.release-tag-pattern }}
+        PLANNED_VERSION_TAG: ${{ inputs.planned-version-tag }}
         FLOATING_TAGS: ${{ inputs.floating-tags }}
 
     - name: Resolve Build Platforms
@@ -543,28 +561,29 @@ runs:
     # =============================================================================
     
     - name: Login to Docker Hub
-      if: steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/login-action@v4
+      continue-on-error: true
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
     
     - name: Login to GitHub Container Registry
-      if: steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/login-action@v4
+      continue-on-error: true
       with:
         registry: ghcr.io
         username: ${{ inputs.ghcr-username || github.repository_owner }}
         password: ${{ inputs.ghcr-token || github.token }}
     
-    - name: Extract Docker Metadata
-      id: meta
-      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
+    - name: Extract Docker Hub Metadata
+      id: dockerhub-meta
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/metadata-action@v6
+      continue-on-error: true
       with:
-        images: |
-          ${{ (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.dockerhub-image || '' }}
-          ${{ (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.ghcr-image || '' }}
+        images: ${{ steps.detect.outputs.dockerhub-image }}
         tags: |
           type=raw,value=${{ steps.detect.outputs.tags }}
           ${{ steps.detect.outputs.extra-tags }}
@@ -574,18 +593,54 @@ runs:
           org.opencontainers.image.created=${{ github.event.repository.updated_at }}
           ${{ inputs.labels }}
     
-    - name: Build and Push Container Image
-      id: build
-      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
+    - name: Extract GHCR Metadata
+      id: ghcr-meta
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
+      uses: docker/metadata-action@v6
+      continue-on-error: true
+      with:
+        images: ${{ steps.detect.outputs.ghcr-image }}
+        tags: |
+          type=raw,value=${{ steps.detect.outputs.tags }}
+          ${{ steps.detect.outputs.extra-tags }}
+        labels: |
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ steps.sha.outputs.sha }}
+          org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+          ${{ inputs.labels }}
+
+    - name: Build and Push Docker Hub Image
+      id: dockerhub-build
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'docker-hub' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
       uses: docker/build-push-action@v7
+      continue-on-error: true
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
         platforms: ${{ steps.platforms.outputs.platforms }}
         push: ${{ inputs.push-enabled }}
         load: ${{ inputs.load-enabled }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ steps.dockerhub-meta.outputs.tags }}
+        labels: ${{ steps.dockerhub-meta.outputs.labels }}
+        build-args: ${{ inputs.build-args }}
+        cache-from: ${{ inputs.cache-enabled == 'true' && 'type=gha' || '' }}
+        cache-to: ${{ inputs.cache-enabled == 'true' && 'type=gha,mode=max' || '' }}
+        provenance: ${{ inputs.provenance }}
+        sbom: ${{ inputs.sbom }}
+
+    - name: Build and Push GHCR Image
+      id: ghcr-build
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && (inputs.registry == 'ghcr' || inputs.registry == 'both') && steps.detect.outputs.build-flow-type != 'skip'
+      uses: docker/build-push-action@v7
+      continue-on-error: true
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        platforms: ${{ steps.platforms.outputs.platforms }}
+        push: ${{ inputs.push-enabled }}
+        load: ${{ inputs.load-enabled }}
+        tags: ${{ steps.ghcr-meta.outputs.tags }}
+        labels: ${{ steps.ghcr-meta.outputs.labels }}
         build-args: ${{ inputs.build-args }}
         cache-from: ${{ inputs.cache-enabled == 'true' && 'type=gha' || '' }}
         cache-to: ${{ inputs.cache-enabled == 'true' && 'type=gha,mode=max' || '' }}
@@ -594,24 +649,34 @@ runs:
     
     - name: Generate Action Outputs
       id: output
-      if: steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip'
       shell: bash
+      continue-on-error: true
       run: |
         bash ${{ github.action_path }}/scripts/generate-outputs.sh
       env:
-        BUILD_DIGEST: ${{ steps.build.outputs.digest }}
-        BUILD_METADATA: ${{ steps.build.outputs.metadata }}
+        BUILD_DIGEST: ${{ steps.dockerhub-build.outputs.digest || steps.ghcr-build.outputs.digest }}
+        BUILD_METADATA: ${{ steps.dockerhub-build.outputs.metadata || steps.ghcr-build.outputs.metadata }}
         BUILD_FLOW_TYPE: ${{ steps.detect.outputs.build-flow-type }}
-        IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         SHORT_SHA: ${{ steps.detect.outputs.short-sha }}
         REGISTRY: ${{ inputs.registry }}
+        PUSH_ENABLED: ${{ inputs.push-enabled }}
+        DOCKERHUB_PUBLISHED: ${{ inputs.push-enabled == 'true' && steps.dockerhub-build.outcome == 'success' }}
+        GHCR_PUBLISHED: ${{ inputs.push-enabled == 'true' && steps.ghcr-build.outcome == 'success' }}
+        DOCKERHUB_IMAGE_TAGS: ${{ steps.dockerhub-build.outcome == 'success' && steps.dockerhub-meta.outputs.tags || '' }}
+        GHCR_IMAGE_TAGS: ${{ steps.ghcr-build.outcome == 'success' && steps.ghcr-meta.outputs.tags || '' }}
+
+    - name: Fail if all selected registry publishes failed
+      if: always() && steps.commit-gate.outputs.should-build != 'false' && steps.detect.outputs.build-flow-type != 'skip' && inputs.push-enabled == 'true' && steps.output.outputs.artifact-published != 'true'
+      shell: bash
+      run: exit 1
     
     # =============================================================================
     # POST-BUILD SECURITY SCANNING
     # =============================================================================
     
     - name: Scan Baseline Image (for comparison)
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != '' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && inputs.comparison-baseline-image != '' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
@@ -624,12 +689,12 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Scan Container Image
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
-        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        image-ref: ${{ steps.output.outputs.published-image }}
         format: 'json'
         output: 'trivy-image-results.json'
         severity: ${{ inputs.trivy-severity }}
@@ -637,21 +702,21 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Parse Trivy Results and Generate Summary
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       id: scan-summary
       shell: bash
       run: |
         node ${{ github.action_path }}/dist/parse-trivy-results.js
     
     - name: Generate Vulnerability Comparison
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.enable-image-comparison == 'true' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       shell: bash
       continue-on-error: true
       run: |
         node ${{ github.action_path }}/dist/generate-comparison.js
     
     - name: Check Vulnerability Threshold
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.fail-on-vulnerability == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.fail-on-vulnerability == 'true' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       shell: bash
       run: |
         if [ -f trivy-scan-summary.json ]; then
@@ -677,12 +742,12 @@ runs:
         fi
     
     - name: Upload Container Image Scan to GitHub Security
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       uses: aquasecurity/trivy-action@v0.36.0
       continue-on-error: true
       with:
         scan-type: 'image'
-        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        image-ref: ${{ steps.output.outputs.published-image }}
         format: 'sarif'
         output: 'trivy-image-results.sarif'
         severity: ${{ inputs.trivy-severity }}
@@ -690,7 +755,7 @@ runs:
         timeout: ${{ inputs.trivy-timeout }}
     
     - name: Upload Image Scan SARIF
-      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip'
+      if: steps.commit-gate.outputs.should-build != 'false' && inputs.image-scan-enabled == 'true' && inputs.upload-sarif == 'true' && steps.detect.outputs.build-flow-type != 'skip' && steps.output.outputs.artifact-published == 'true'
       uses: github/codeql-action/upload-sarif@v4
       continue-on-error: true
       with:
