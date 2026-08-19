@@ -209,6 +209,47 @@ assert_no_push_registry_aggregation() {
     fi
 }
 
+action_step() {
+    local name="$1"
+
+    awk -v name="$name" '
+        /^    - name: / {
+            if (capture) {
+                exit
+            }
+            capture = index($0, "- name: " name) > 0
+        }
+        capture {
+            print
+        }
+    ' "$ROOT/action.yml"
+}
+
+assert_registry_builds_require_successful_logins_when_pushing() {
+    local dockerhub_login
+    local ghcr_login
+    local dockerhub_build
+    local ghcr_build
+
+    dockerhub_login="$(action_step "Login to Docker Hub")"
+    ghcr_login="$(action_step "Login to GitHub Container Registry")"
+    dockerhub_build="$(action_step "Build and Push Docker Hub Image")"
+    ghcr_build="$(action_step "Build and Push GHCR Image")"
+
+    [[ "$dockerhub_login" == *"id: dockerhub-login"* ]] ||
+        fail "Docker Hub login must have a stable ID"
+    [[ "$ghcr_login" == *"id: ghcr-login"* ]] ||
+        fail "GHCR login must have a stable ID"
+    [[ "$dockerhub_login" == *"continue-on-error: true"* ]] ||
+        fail "Docker Hub login must remain independently attempted"
+    [[ "$ghcr_login" == *"continue-on-error: true"* ]] ||
+        fail "GHCR login must remain independently attempted"
+    [[ "$dockerhub_build" == *"inputs.push-enabled != 'true' || steps.dockerhub-login.outcome == 'success'"* ]] ||
+        fail "Docker Hub push builds must require a successful Docker Hub login"
+    [[ "$ghcr_build" == *"inputs.push-enabled != 'true' || steps.ghcr-login.outcome == 'success'"* ]] ||
+        fail "GHCR push builds must require a successful GHCR login"
+}
+
 assert_planned_main_release
 assert_planned_custom_pattern_preserves_version_prefix
 assert_planned_main_prerelease
@@ -218,5 +259,6 @@ assert_omitted_planned_tag_stages_main
 assert_invalid_planned_tag_skips_main
 assert_registry_aggregation
 assert_no_push_registry_aggregation
+assert_registry_builds_require_successful_logins_when_pushing
 
 echo "PASS: container build flow behavior"
