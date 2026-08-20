@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.9.0] - 2026-08-20
+
+### Added
+
+- add planned registry publishing (#54)
+
+### Changed
+
+- support planned manual releases (#56)
+- join image tags with real newline
+
 ## [1.8.1] - 2026-05-05
 
 ### Changed
