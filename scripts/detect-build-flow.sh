@@ -48,6 +48,7 @@ GITHUB_BASE_REF="${GITHUB_BASE_REF:-}"
 RELEASE_TAG="${RELEASE_TAG:-}"
 RELEASE_PRERELEASE="${RELEASE_PRERELEASE:-false}"
 RELEASE_TAG_PATTERN="${RELEASE_TAG_PATTERN-^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$}"
+PLANNED_VERSION_TAG="${PLANNED_VERSION_TAG:-}"
 
 # User-configurable inputs (from action.yml)
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
@@ -103,7 +104,7 @@ get_repo_name() {
 # Extract prerelease identifier from semver (e.g., "beta" from "1.2.3-beta.1")
 extract_prerelease_id() {
     local version="$1"
-    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-([a-zA-Z][0-9A-Za-z-]*) ]]; then
+    if [[ "$version" =~ [0-9]+\.[0-9]+\.[0-9]+-([0-9A-Za-z-]+) ]]; then
         echo "${BASH_REMATCH[1]}"
     else
         echo ""
@@ -162,6 +163,7 @@ detect_build_flow() {
     log_debug "Configuration:"
     log_debug "  Main Branch: ${MAIN_BRANCH}"
     log_debug "  Dev Branch: ${DEV_BRANCH}"
+    log_debug "  Planned Version Tag: ${PLANNED_VERSION_TAG:-<not set>}"
     
     local flow_type=""
     local release_version=""
@@ -203,8 +205,8 @@ detect_build_flow() {
             log_warning "Flow: Work in progress (non-standard PR)"
         fi
         
-    elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
-        log_info "Push event detected"
+    elif [ "$GITHUB_EVENT_NAME" = "push" ] || { [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$GITHUB_REF" = "refs/heads/${MAIN_BRANCH}" ] && [ -n "$PLANNED_VERSION_TAG" ]; }; then
+        log_info "Push or planned manual release detected"
         
         # Extract branch name from ref
         local branch="${GITHUB_REF#refs/heads/}"
@@ -215,10 +217,35 @@ detect_build_flow() {
             flow_type="dev"
             log_success "Flow: Push to dev branch"
             
-        # Push to main branch -> staging for pre-production validation
+        # Push to main branch -> staging, unless a validated release tag is planned
         elif [ "$branch" = "$MAIN_BRANCH" ]; then
-            flow_type="staging"
-            log_success "Flow: Push to main branch (staging)"
+            if [ -n "$PLANNED_VERSION_TAG" ]; then
+                log_debug "  Planned Version Tag: ${PLANNED_VERSION_TAG}"
+                log_debug "  Release Tag Pattern: ${RELEASE_TAG_PATTERN}"
+
+                if [[ -n "${RELEASE_TAG_PATTERN}" ]] && ! [[ "${PLANNED_VERSION_TAG}" =~ ${RELEASE_TAG_PATTERN} ]]; then
+                    log_warning "Skipping build: tag '${PLANNED_VERSION_TAG}' does not match pattern '${RELEASE_TAG_PATTERN}'"
+                    # Surface the rejected planned tag in the skip summary
+                    RELEASE_TAG="$PLANNED_VERSION_TAG"
+                    flow_type="skip"
+                else
+                    if [[ "$PLANNED_VERSION_TAG" =~ ^v[0-9] ]]; then
+                        release_version="${PLANNED_VERSION_TAG#v}"
+                    else
+                        release_version="$PLANNED_VERSION_TAG"
+                    fi
+                    if [[ "$release_version" =~ [0-9]+\.[0-9]+\.[0-9]+- ]]; then
+                        RELEASE_PRERELEASE=true
+                    else
+                        RELEASE_PRERELEASE=false
+                    fi
+                    flow_type="release"
+                    log_success "Flow: Planned production release (${release_version})"
+                fi
+            else
+                flow_type="staging"
+                log_success "Flow: Push to main branch (staging)"
+            fi
             
         # Push to any other branch -> wip-{sha}
         else
@@ -296,32 +323,28 @@ detect_build_flow() {
         log_debug "  Primary tag: ${full_tag}"
 
         # Generate additional tags for releases
-        if parse_semver "$release_version"; then
-            if [ "$RELEASE_PRERELEASE" = "true" ]; then
-                # Pre-release: add channel tag (e.g., "beta" from "1.2.3-beta.1")
-                local prerelease_id
-                prerelease_id=$(extract_prerelease_id "$release_version")
-                if [ -n "$prerelease_id" ]; then
-                    extra_tags="type=raw,value=${TAG_PREFIX}${prerelease_id}${TAG_SUFFIX}"
-                    log_debug "  Pre-release channel tag: ${prerelease_id}"
-                fi
-            else
-                # Standard release: add major, minor, and latest tags
-                extra_tags="type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}.${SEMVER_MINOR}${TAG_SUFFIX}"
-                extra_tags="${extra_tags}
-type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}${TAG_SUFFIX}"
-                extra_tags="${extra_tags}
-type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
-                log_debug "  Minor tag: ${SEMVER_MAJOR}.${SEMVER_MINOR}"
-                log_debug "  Major tag: ${SEMVER_MAJOR}"
-                log_debug "  Latest tag: latest"
+        if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            # Pre-release: add channel tag (e.g., "beta" from "1.2.3-beta.1")
+            local prerelease_id
+            prerelease_id=$(extract_prerelease_id "$release_version")
+            if [ -n "$prerelease_id" ]; then
+                extra_tags="type=raw,value=${TAG_PREFIX}${prerelease_id}${TAG_SUFFIX}"
+                log_debug "  Pre-release channel tag: ${prerelease_id}"
             fi
+        elif parse_semver "$release_version"; then
+            # Standard release: add major, minor, and latest tags
+            extra_tags="type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}.${SEMVER_MINOR}${TAG_SUFFIX}"
+            extra_tags="${extra_tags}
+type=raw,value=${TAG_PREFIX}${SEMVER_MAJOR}${TAG_SUFFIX}"
+            extra_tags="${extra_tags}
+type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
+            log_debug "  Minor tag: ${SEMVER_MAJOR}.${SEMVER_MINOR}"
+            log_debug "  Major tag: ${SEMVER_MAJOR}"
+            log_debug "  Latest tag: latest"
         else
             # Non-semver tag: just use the version as-is, add latest for non-prerelease
-            if [ "$RELEASE_PRERELEASE" != "true" ]; then
-                extra_tags="type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
-                log_debug "  Latest tag: latest"
-            fi
+            extra_tags="type=raw,value=${TAG_PREFIX}latest${TAG_SUFFIX}"
+            log_debug "  Latest tag: latest"
         fi
     else
         # Non-release flows: existing behavior
