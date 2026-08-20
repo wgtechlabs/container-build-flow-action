@@ -205,8 +205,8 @@ detect_build_flow() {
             log_warning "Flow: Work in progress (non-standard PR)"
         fi
         
-    elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
-        log_info "Push event detected"
+    elif [ "$GITHUB_EVENT_NAME" = "push" ] || { [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$GITHUB_REF" = "refs/heads/${MAIN_BRANCH}" ] && [ -n "$PLANNED_VERSION_TAG" ]; }; then
+        log_info "Push or planned manual release detected"
         
         # Extract branch name from ref
         local branch="${GITHUB_REF#refs/heads/}"
