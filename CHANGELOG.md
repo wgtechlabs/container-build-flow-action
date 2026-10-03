@@ -7,20 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [1.9.0] - 2026-08-20
+
 ### Added
 
-- add `release-platforms` input for multi-arch release builds
-- add unified workflow example for PR, dev, and release builds
-- add `bot-detection` input to auto-detect bot actors and skip builds gracefully
-- add `bot-detected` output for downstream visibility
-- add `floating-tags` input for mutable floating tags in non-release build flows
+- add planned registry publishing (#54)
 
 ### Changed
 
-- release builds now default to `linux/amd64,linux/arm64` platforms
-- Bump aquasecurity/trivy-action from 0.35.0 to 0.36.0
-- Bump actions/github-script from 8 to 9
+- support planned manual releases (#56)
+- join image tags with real newline
 
+## [1.8.1] - 2026-05-05
+
+### Changed
+
+- fix validation order and disabled-state outputs
+- fix bot-detection false skips on human-authored PRs (#43)
+
+## [1.8.0] - 2026-05-02
+
+### Added
+
+- add floating-tags input for non-release build flows
+
+### Changed
+
+- update extra-tags output comment to include floating tags
+- Bump actions/github-script from 8 to 9 (#37)
+- Bump aquasecurity/trivy-action from 0.35.0 to 0.36.0 (#38)
 
 ## [1.7.1] - 2026-04-06
 

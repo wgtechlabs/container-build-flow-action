@@ -1,12 +1,13 @@
 {
   "name": "container-build-flow-action",
-  "version": "1.7.1",
+  "version": "1.9.0",
   "description": "Automated Docker/Container builds with PR/WIP/DEV/PATCH/Release flow support",
   "private": true,
   "scripts": {
     "build": "bun build src/parse-trivy-results.ts --outdir dist --target node --format cjs && bun build src/generate-comparison.ts --outdir dist --target node --format cjs && bun build src/pr-comment.ts --outdir dist --target node --format cjs",
     "clean": "rm -rf dist",
     "rebuild": "bun run clean && bun run build",
+    "test": "bash tests/test-container-build-flow.sh",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
